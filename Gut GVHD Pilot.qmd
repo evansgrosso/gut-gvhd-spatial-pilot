@@ -5,6 +5,9 @@ editor: visual
 ---
 
 #### Data Loading
+
+
+
 ```{r}
 library(Seurat)
 install.packages("arrow")
@@ -14,6 +17,7 @@ spatial_dir <- "Data/SLV14/spatial"
 
 counts <- Read10X(data.dir = matrix_dir)
 slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
+slv14 <- subset(slv14, subset = nCount_Spatial >= 50)
 
 img <- Read10X_Image(image.dir = spatial_dir, image.name = "tissue_lowres_image.png")
 img <- img[Cells(slv14)]
@@ -21,5 +25,10 @@ DefaultAssay(img) <- "Spatial"
 slv14[["slice1"]] <- img  # attach image to the object
 
 slv14
+```
+
+#### Data Quality Control
+```{r}
+
 ```
 
