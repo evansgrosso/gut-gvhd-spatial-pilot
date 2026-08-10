@@ -6,8 +6,6 @@ editor: visual
 
 #### Data Loading
 
-
-
 ```{r}
 library(Seurat)
 install.packages("arrow")
@@ -28,6 +26,7 @@ slv14
 ```
 
 #### Data Quality Control
+
 ```{r}
 
 slv14[["percent.mt"]] <- PercentageFeatureSet(slv14, pattern = "^MT-")
@@ -67,3 +66,9 @@ FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial"
 dim(slv14)
 ```
 
+#### Data Normalization and Scaling
+
+```{r}
+slv14 <- SCTransform(slv14, assay = "Spatial", vars.to.regress = "percent.mt",
+                     do.correct.umi = FALSE, conserve.memory = TRUE)
+```
