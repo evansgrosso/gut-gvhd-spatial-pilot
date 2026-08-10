@@ -1,0 +1,9 @@
+data/
+*.h5
+*.mtx
+*.mtx.gz
+*.rds
+.DS_Store
+.Rproj.user/
+.Rhistory
+.RData
