@@ -72,3 +72,21 @@ dim(slv14)
 slv14 <- SCTransform(slv14, assay = "Spatial", vars.to.regress = "percent.mt",
                      do.correct.umi = FALSE, conserve.memory = TRUE)
 ```
+
+#### Data Dimension Reduction
+
+```{r}
+slv14 = RunPCA(slv14, assay = "SCT", npcs = 50)
+
+ElbowPlot(slv14, ndims = 50)
+
+slv14 <- FindNeighbors(slv14, reduction = "pca", dims = 1:15)
+slv14 <- FindClusters(slv14)
+
+slv14 <- RunUMAP(slv14, dims = 1:15)
+
+DimPlot(slv14, reduction = "umap", label = TRUE)
+SpatialDimPlot(slv14, label = TRUE, label.size = 3)
+
+
+```
