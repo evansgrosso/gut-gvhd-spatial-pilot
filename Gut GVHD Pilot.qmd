@@ -8,6 +8,7 @@ editor: visual
 
 ```{r}
 library(Seurat)
+library(dplyr)
 install.packages("arrow")
 
 matrix_dir <- "Data/SLV14/filtered_feature_bc_matrix"
@@ -75,13 +76,15 @@ slv14 <- SCTransform(slv14, assay = "Spatial", vars.to.regress = "percent.mt",
 
 #### Data Dimension Reduction
 
+#TODO: A lower clustering resolution was used after FindAllMarkers() returned no features for two clusters. Even after lower resolution was used, one cluster still returned empty. Revisit.
+
 ```{r}
 slv14 = RunPCA(slv14, assay = "SCT", npcs = 50)
 
 ElbowPlot(slv14, ndims = 50)
 
 slv14 <- FindNeighbors(slv14, reduction = "pca", dims = 1:15)
-slv14 <- FindClusters(slv14)
+slv14 <- FindClusters(slv14, resolution = 0.4)
 
 slv14 <- RunUMAP(slv14, dims = 1:15)
 
@@ -89,4 +92,16 @@ DimPlot(slv14, reduction = "umap", label = TRUE)
 SpatialDimPlot(slv14, label = TRUE, label.size = 3)
 
 
+```
+
+#### Data Markers
+
+#TODO: Revisit empty cluster 0.
+
+```{r}
+slv14_markers <- FindAllMarkers(slv14, only.pos = TRUE, min.pct = 0.10, logfc.threshold = 0.25)
+
+slv14_top_markers <- slv14_markers %>% filter(p_val_adj < 0.05, pct.1 - pct.2 > 0.10) %>% group_by (cluster) %>% slice_max(avg_log2FC, n = 10)
+
+print(slv14_top_markers)
 ```
