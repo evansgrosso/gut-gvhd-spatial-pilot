@@ -1,7 +1,14 @@
 ---
 title: "Gut GVHD Pilot"
-format: html
+format:
+  html:
+    embed-resources: true
 editor: visual
+execute:
+  echo: true
+  output: true
+  warning: false
+  message: false
 ---
 
 #### Data Loading
@@ -9,7 +16,6 @@ editor: visual
 ```{r}
 library(Seurat)
 library(dplyr)
-install.packages("arrow")
 
 matrix_dir <- "Data/SLV14/filtered_feature_bc_matrix"
 spatial_dir <- "Data/SLV14/spatial"
@@ -118,5 +124,14 @@ slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_sc
 slv14 <- AddModuleScore(slv14, features = list(isc_genes),     name = "ISC_score")
 
 SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1"))
+
+```
+
+#### Population Bin Correlation Testing
+
+```{r}
+cor.test(slv14$ISC_score1, slv14$CD8eff_score1)
+cor.test(slv14$ISC_score1, slv14$CD4eff_score1)
+cor.test(slv14$CD8eff_score1, slv14$CD4eff_score1)
 
 ```
