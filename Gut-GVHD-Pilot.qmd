@@ -13,6 +13,8 @@ execute:
 
 #### Data Loading
 
+Sample SLV14 was chosen because it is an example of severe GVHD. 16 micrometer resolution was chosen due to limitations of computational resources.
+
 ```{r}
 library(Seurat)
 library(dplyr)
@@ -33,6 +35,8 @@ slv14
 ```
 
 #### Data Quality Control
+
+I used Median Absolute Deviations as my standard for filtering spots. Data poitns above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.
 
 ```{r}
 
@@ -75,6 +79,8 @@ dim(slv14)
 
 #### Data Normalization and Scaling
 
+SCTransform() was chosen to normalize and scale the dataset.
+
 ```{r}
 slv14 <- SCTransform(slv14, assay = "Spatial", vars.to.regress = "percent.mt",
                      do.correct.umi = FALSE, conserve.memory = TRUE)
@@ -114,6 +120,8 @@ print(slv14_top_markers)
 
 #### Data Module Scoring
 
+Module scoring was used to determine transcription activity for each bin population profile quantitatively.
+
 ```{r}
 cd8_eff_genes <- c("CD3E","CD3G","CD3D","NKG7","CST7","GZMK","GZMH","CD8A","GZMB","GZMM","GZMA","PRF1","LYST","LAG3","APOBEC3G")
 cd4_eff_genes <- c("CD3E","CD3G","CD3D","CD40LG","CD4","TNFRSF4","IL7R","CCR4","CD28","TNF","IL2","DYNLT3","DPP4","IL4I1","CCL20")
@@ -128,6 +136,10 @@ SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_sc
 ```
 
 #### Population Bin Correlation Testing
+
+The module scores for each cell population of interest were compared with each other to identify if the presence of one enriched cell population indicates greater or lesser enrichment of the other in the same bin.
+
+The results match with those suggested in the paper (CD4+ and CD8+ enrichment are positively correlated with each other; T cell and ISC enrichment are negatively correlated with each other)
 
 ```{r}
 cor.test(slv14$ISC_score1, slv14$CD8eff_score1)

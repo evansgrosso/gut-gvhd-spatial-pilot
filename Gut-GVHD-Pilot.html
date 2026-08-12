@@ -2226,6 +2226,7 @@ vertical-align: -.125em;
 
 <section id="data-loading" class="level4">
 <h4 class="anchored" data-anchor-id="data-loading">Data Loading</h4>
+<p>Sample SLV14 was chosen because it is an example of severe GVHD. 16 micrometer resolution was chosen due to limitations of computational resources.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
@@ -2254,6 +2255,7 @@ Active assay: Spatial (18085 features, 0 variable features)
 </section>
 <section id="data-quality-control" class="level4">
 <h4 class="anchored" data-anchor-id="data-quality-control">Data Quality Control</h4>
+<p>I used Median Absolute Deviations as my standard for filtering spots. Data poitns above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>slv14[[<span class="st">&quot;percent.mt&quot;</span>]] <span class="ot">&lt;-</span> <span class="fu">PercentageFeatureSet</span>(slv14, <span class="at">pattern =</span> <span class="st">&quot;^MT-&quot;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -2325,6 +2327,7 @@ Active assay: Spatial (18085 features, 0 variable features)
 </section>
 <section id="data-normalization-and-scaling" class="level4">
 <h4 class="anchored" data-anchor-id="data-normalization-and-scaling">Data Normalization and Scaling</h4>
+<p>SCTransform() was chosen to normalize and scale the dataset.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>slv14 <span class="ot">&lt;-</span> <span class="fu">SCTransform</span>(slv14, <span class="at">assay =</span> <span class="st">&quot;Spatial&quot;</span>, <span class="at">vars.to.regress =</span> <span class="st">&quot;percent.mt&quot;</span>,</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>                     <span class="at">do.correct.umi =</span> <span class="cn">FALSE</span>, <span class="at">conserve.memory =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -2384,7 +2387,7 @@ Number of edges: 920217
 Running Louvain algorithm...
 Maximum modularity in 10 random starts: 0.8987
 Number of communities: 10
-Elapsed time: 4 seconds</code></pre>
+Elapsed time: 7 seconds</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>slv14 <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(slv14, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">15</span>)</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -2436,6 +2439,7 @@ Elapsed time: 4 seconds</code></pre>
 </section>
 <section id="data-module-scoring" class="level4">
 <h4 class="anchored" data-anchor-id="data-module-scoring">Data Module Scoring</h4>
+<p>Module scoring was used to determine transcription activity for each bin population profile quantitatively.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>cd8_eff_genes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD3E&quot;</span>,<span class="st">&quot;CD3G&quot;</span>,<span class="st">&quot;CD3D&quot;</span>,<span class="st">&quot;NKG7&quot;</span>,<span class="st">&quot;CST7&quot;</span>,<span class="st">&quot;GZMK&quot;</span>,<span class="st">&quot;GZMH&quot;</span>,<span class="st">&quot;CD8A&quot;</span>,<span class="st">&quot;GZMB&quot;</span>,<span class="st">&quot;GZMM&quot;</span>,<span class="st">&quot;GZMA&quot;</span>,<span class="st">&quot;PRF1&quot;</span>,<span class="st">&quot;LYST&quot;</span>,<span class="st">&quot;LAG3&quot;</span>,<span class="st">&quot;APOBEC3G&quot;</span>)</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>cd4_eff_genes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD3E&quot;</span>,<span class="st">&quot;CD3G&quot;</span>,<span class="st">&quot;CD3D&quot;</span>,<span class="st">&quot;CD40LG&quot;</span>,<span class="st">&quot;CD4&quot;</span>,<span class="st">&quot;TNFRSF4&quot;</span>,<span class="st">&quot;IL7R&quot;</span>,<span class="st">&quot;CCR4&quot;</span>,<span class="st">&quot;CD28&quot;</span>,<span class="st">&quot;TNF&quot;</span>,<span class="st">&quot;IL2&quot;</span>,<span class="st">&quot;DYNLT3&quot;</span>,<span class="st">&quot;DPP4&quot;</span>,<span class="st">&quot;IL4I1&quot;</span>,<span class="st">&quot;CCL20&quot;</span>)</span>
@@ -2457,6 +2461,8 @@ Elapsed time: 4 seconds</code></pre>
 </section>
 <section id="population-bin-correlation-testing" class="level4">
 <h4 class="anchored" data-anchor-id="population-bin-correlation-testing">Population Bin Correlation Testing</h4>
+<p>The module scores for each cell population of interest were compared with each other to identify if the presence of one enriched cell population indicates greater or lesser enrichment of the other in the same bin.</p>
+<p>The results match with those suggested in the paper (CD4+ and CD8+ enrichment are positively correlated with each other; T cell and ISC enrichment are negatively correlated with each other)</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cor.test</span>(slv14<span class="sc">$</span>ISC_score1, slv14<span class="sc">$</span>CD8eff_score1)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
