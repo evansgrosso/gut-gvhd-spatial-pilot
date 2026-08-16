@@ -21,13 +21,19 @@ In v1, 8 um resolution was used.
 library(Seurat)
 library(dplyr)
 library(reticulate)
+library(arrow)
 
 matrix_dir <- "data/SLV14/binned_outputs/square_008um/filtered_feature_bc_matrix"
 spatial_dir <- "data/SLV14/binned_outputs/square_008um/spatial"
 
 counts <- Read10X(data.dir = matrix_dir)
+
+positions <- read_parquet(file.path(spatial_dir, "tissue_positions.parquet"))
+tissue_barcodes <- positions$barcode[positions$in_tissue == 1]
+
+counts <- counts[, colnames(counts) %in% tissue_barcodes]
+
 slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
-slv14 <- subset(slv14, subset = nCount_Spatial >= 50)
 
 img <- Read10X_Image(image.dir = spatial_dir, image.name = "tissue_lowres_image.png")
 img <- img[Cells(slv14)]
@@ -35,6 +41,12 @@ DefaultAssay(img) <- "Spatial"
 slv14[["slice1"]] <- img  # attach image to the object
 
 slv14
+
+SpatialFeaturePlot(
+  slv14,
+  features = "nCount_Spatial",
+  pt.size.factor = 1
+)
 ```
 
 #### Data Quality Control
@@ -78,6 +90,12 @@ VlnPlot(slv14, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"))
 FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
 
 dim(slv14)
+
+SpatialFeaturePlot(
+  slv14,
+  features = "nCount_Spatial",
+  pt.size.factor = 1
+)
 ```
 
 #### Data Normalization and Scaling
@@ -91,17 +109,15 @@ slv14 <- SCTransform(slv14, assay = "Spatial", vars.to.regress = "percent.mt",
 
 #### Data Dimension Reduction
 
-#TODO: A lower clustering resolution was used after FindAllMarkers() returned no features for two clusters. Even after lower resolution was used, one cluster still returned empty. Revisit.
-
 ```{r}
 slv14 = RunPCA(slv14, assay = "SCT", npcs = 50)
 
 ElbowPlot(slv14, ndims = 50)
 
-slv14 <- FindNeighbors(slv14, reduction = "pca", dims = 1:15)
-slv14 <- FindClusters(slv14, resolution = 0.4)
+slv14 <- FindNeighbors(slv14, reduction = "pca", dims = 1:20)
+slv14 <- FindClusters(slv14, resolution = 0.8)
 
-slv14 <- RunUMAP(slv14, dims = 1:15)
+slv14 <- RunUMAP(slv14, dims = 1:20)
 
 DimPlot(slv14, reduction = "umap", label = TRUE)
 SpatialDimPlot(slv14, label = TRUE, label.size = 3)
@@ -110,8 +126,6 @@ SpatialDimPlot(slv14, label = TRUE, label.size = 3)
 ```
 
 #### Data Markers
-
-#TODO: Revisit empty cluster 0.
 
 ```{r}
 slv14_markers <- FindAllMarkers(slv14, only.pos = TRUE, min.pct = 0.10, logfc.threshold = 0.25)

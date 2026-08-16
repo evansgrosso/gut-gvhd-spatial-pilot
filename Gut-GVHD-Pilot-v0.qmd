@@ -32,6 +32,12 @@ DefaultAssay(img) <- "Spatial"
 slv14[["slice1"]] <- img  # attach image to the object
 
 slv14
+
+SpatialFeaturePlot(
+  slv14,
+  features = "nCount_Spatial",
+  pt.size.factor = 1
+)
 ```
 
 #### Data Quality Control
