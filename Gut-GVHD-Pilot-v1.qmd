@@ -19,8 +19,8 @@ Sample SLV14 was chosen because it is an example of severe GVHD. 16 micrometer r
 library(Seurat)
 library(dplyr)
 
-matrix_dir <- "Data/SLV14/16_micrometers/filtered_feature_bc_matrix"
-spatial_dir <- "Data/SLV14/16_micrometers/spatial"
+matrix_dir <- "data/SLV14/binned_outputs/square_002um/filtered_feature_bc_matrix"
+spatial_dir <- "data/SLV14/binned_outputs/square_002um/spatial"
 
 counts <- Read10X(data.dir = matrix_dir)
 slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")

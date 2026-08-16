@@ -21,12 +21,13 @@ library(dplyr)
 
 matrix_dir <- "data/SLV14/binned_outputs/square_016um/filtered_feature_bc_matrix"
 spatial_dir <- "data/SLV14/binned_outputs/square_016um/spatial"
+image_dir <- "data/SLV14"
 
 counts <- Read10X(data.dir = matrix_dir)
 slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
 slv14 <- subset(slv14, subset = nCount_Spatial >= 50)
 
-img <- Read10X_Image(image.dir = spatial_dir, image.name = "tissue_lowres_image.png")
+img <- Read10X_Image(image.dir = image_dir, image.name = "tissue_lowres_image.png")
 img <- img[Cells(slv14)]
 DefaultAssay(img) <- "Spatial"
 slv14[["slice1"]] <- img  # attach image to the object
@@ -147,3 +148,4 @@ cor.test(slv14$ISC_score1, slv14$CD4eff_score1)
 cor.test(slv14$CD8eff_score1, slv14$CD4eff_score1)
 
 ```
+
