@@ -13,14 +13,17 @@ execute:
 
 #### Data Loading
 
-Sample SLV14 was chosen because it is an example of severe GVHD. 16 micrometer resolution was chosen due to limitations of computational resources.
+Sample SLV14 was chosen because it is an example of severe GVHD.
+
+In v1, 8 um resolution was used.
 
 ```{r}
 library(Seurat)
 library(dplyr)
+library(reticulate)
 
-matrix_dir <- "data/SLV14/binned_outputs/square_002um/filtered_feature_bc_matrix"
-spatial_dir <- "data/SLV14/binned_outputs/square_002um/spatial"
+matrix_dir <- "data/SLV14/binned_outputs/square_008um/filtered_feature_bc_matrix"
+spatial_dir <- "data/SLV14/binned_outputs/square_008um/spatial"
 
 counts <- Read10X(data.dir = matrix_dir)
 slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
@@ -36,7 +39,7 @@ slv14
 
 #### Data Quality Control
 
-I used Median Absolute Deviations as my standard for filtering spots. Data poitns above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.
+I used Median Absolute Deviations as my standard for filtering spots. Data points above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.
 
 ```{r}
 
