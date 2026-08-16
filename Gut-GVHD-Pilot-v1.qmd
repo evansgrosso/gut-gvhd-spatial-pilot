@@ -22,6 +22,7 @@ library(Seurat)
 library(dplyr)
 library(reticulate)
 library(arrow)
+library(ggplot2)
 
 matrix_dir <- "data/SLV14/binned_outputs/square_008um/filtered_feature_bc_matrix"
 spatial_dir <- "data/SLV14/binned_outputs/square_008um/spatial"
@@ -141,13 +142,33 @@ Module scoring was used to determine transcription activity for each bin populat
 
 ```{r}
 cd8_eff_genes <- c("CD3E","CD3G","CD3D","NKG7","CST7","GZMK","GZMH","CD8A","GZMB","GZMM","GZMA","PRF1","LYST","LAG3","APOBEC3G")
+
 cd4_eff_genes <- c("CD3E","CD3G","CD3D","CD40LG","CD4","TNFRSF4","IL7R","CCR4","CD28","TNF","IL2","DYNLT3","DPP4","IL4I1","CCL20")
-isc_genes     <- c("LGR5","ASCL2","SMOC2","MSI1","RARRES2","SOX9","CENPM","EPHB2","OLFM4")
 
-slv14 <- AddModuleScore(slv14, features = list(cd8_eff_genes), name = "CD8eff_score")
-slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_score")
-slv14 <- AddModuleScore(slv14, features = list(isc_genes),     name = "ISC_score")
+isc_genes <- c("LGR5","ASCL2","SMOC2","MSI1","RARRES2","SOX9","CENPM","EPHB2","OLFM4")
 
-SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1"))
+iNKT_genes <- c("CD3D","CD3E","TRAC","ZBTB16", "KLRB1","NKG7","KLRD1","GNLY")
+
+MHC_Class_II_genes = c("CD74","CIITA")
+
+MHC_Class_I_genes = c("B2M","TAP1","TAP2","NLRC5")
+
+Extrinsic_Apoptosis_genes = c("FAS","FASLG","FADD","CASP8", "TNFRSF10A","TNFRSF10B","TNFSF10","CFLAR")
+
+Glycolysis = c("SLC2A1","HK1","HK2","PFKP", "PGK1","ENO1","PKM")
+
+Fatty_Acid_Oxidation = c("CPT1A","CPT2","ACADM","ACADVL","HADHA","HADHB","ECHS1","ACAA2")
+
+slv14 <- AddModuleScore(slv14, features = list(cd8_eff_genes), name = "CD8eff_score1")
+slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_score1")
+slv14 <- AddModuleScore(slv14, features = list(isc_genes), name = "ISC_score1")
+slv14 <- AddModuleScore(slv14, features = list(iNKT_genes), name = "iNKT_score1")
+slv14 <- AddModuleScore(slv14, features = list(MHC_Class_II_genes), name = "MHCII_score1")
+slv14 <- AddModuleScore(slv14, features = list(MHC_Class_I_genes), name = "MHCI_score1")
+slv14 <- AddModuleScore(slv14, features = list(Extrinsic_Apoptosis_genes), name = "ExtrinsicApoptosis_score1")
+slv14 <- AddModuleScore(slv14, features = list(Glycolysis), name = "Glycolysis_score1")
+slv14 <- AddModuleScore(slv14, features = list(Fatty_Acid_Oxidation), name = "FAO_score1")
+
+SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1", "CD8eff_score1", "MHCII_score1", "MHCI_score1", "ExtrinsicApoptosis_score1", "Glycolysis_score1", "FAO_score1"))
 
 ```
