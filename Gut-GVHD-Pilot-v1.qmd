@@ -172,3 +172,10 @@ slv14 <- AddModuleScore(slv14, features = list(Fatty_Acid_Oxidation), name = "FA
 SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1", "CD8eff_score1", "MHCII_score1", "MHCI_score1", "ExtrinsicApoptosis_score1", "Glycolysis_score1", "FAO_score1"))
 
 ```
+
+#### Labeling Phenotypes of Interest
+
+```{r}
+hist(obj$MHCI_score1, breaks = 50)
+hist(obj$MHCII_score1, breaks = 50)
+```
