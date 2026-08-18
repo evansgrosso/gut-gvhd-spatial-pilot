@@ -39,9 +39,11 @@ slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
 img <- Read10X_Image(image.dir = spatial_dir, image.name = "tissue_lowres_image.png")
 img <- img[Cells(slv14)]
 DefaultAssay(img) <- "Spatial"
-slv14[["slice1"]] <- img  # attach image to the object
+slv14[["slice1"]] <- img
 
 slv14
+
+slv14 <- subset(slv14, subset = nCount_Spatial >= 50)
 
 SpatialFeaturePlot(
   slv14,
@@ -56,7 +58,7 @@ I used Median Absolute Deviations as my standard for filtering spots. Data point
 
 ```{r}
 
-slv14[["percent.mt"]] <- PercentageFeatureSet(slv14, pattern = "^MT-")
+slv14 <- subset(slv14, subset = nCount_Spatial > 0)
 
 VlnPlot(slv14, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"))
 FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
@@ -81,11 +83,13 @@ feature_upper_log <- (med_feature + (mad_val_feature*3))
 feature_lower <- expm1(feature_lower_log)
 feature_upper <- expm1(feature_upper_log)
 
-mt_upper = median(slv14$percent.mt) + (3 * mad(slv14$percent.mt))
+slv14 <- subset(slv14, subset = nCount_Spatial < count_upper & nCount_Spatial > count_lower & nFeature_Spatial > feature_lower & nFeature_Spatial < feature_upper)
 
-dim(slv14)
+slv14[["percent.mt"]] <- PercentageFeatureSet(slv14, pattern = "^MT-")
 
-slv14 <- subset(slv14, subset = nCount_Spatial < count_upper & nCount_Spatial > count_lower & nFeature_Spatial > feature_lower & nFeature_Spatial < feature_upper & percent.mt < mt_upper)
+mt_upper = median(slv14$percent.mt, na.rm = TRUE) + (3 * mad(slv14$percent.mt, na.rm = TRUE))
+
+slv14 <- subset(slv14, subset = percent.mt < mt_upper)
 
 VlnPlot(slv14, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"))
 FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
@@ -159,23 +163,36 @@ Glycolysis = c("SLC2A1","HK1","HK2","PFKP", "PGK1","ENO1","PKM")
 
 Fatty_Acid_Oxidation = c("CPT1A","CPT2","ACADM","ACADVL","HADHA","HADHB","ECHS1","ACAA2")
 
-slv14 <- AddModuleScore(slv14, features = list(cd8_eff_genes), name = "CD8eff_score1")
-slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_score1")
-slv14 <- AddModuleScore(slv14, features = list(isc_genes), name = "ISC_score1")
-slv14 <- AddModuleScore(slv14, features = list(iNKT_genes), name = "iNKT_score1")
-slv14 <- AddModuleScore(slv14, features = list(MHC_Class_II_genes), name = "MHCII_score1")
-slv14 <- AddModuleScore(slv14, features = list(MHC_Class_I_genes), name = "MHCI_score1")
-slv14 <- AddModuleScore(slv14, features = list(Extrinsic_Apoptosis_genes), name = "ExtrinsicApoptosis_score1")
-slv14 <- AddModuleScore(slv14, features = list(Glycolysis), name = "Glycolysis_score1")
-slv14 <- AddModuleScore(slv14, features = list(Fatty_Acid_Oxidation), name = "FAO_score1")
+slv14 <- AddModuleScore(slv14, features = list(cd8_eff_genes), name = "CD8eff_score")
+slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_score")
+slv14 <- AddModuleScore(slv14, features = list(isc_genes), name = "ISC_score")
+slv14 <- AddModuleScore(slv14, features = list(iNKT_genes), name = "iNKT_score")
+slv14 <- AddModuleScore(slv14, features = list(MHC_Class_II_genes), name = "MHCII_score")
+slv14 <- AddModuleScore(slv14, features = list(MHC_Class_I_genes), name = "MHCI_score")
+slv14 <- AddModuleScore(slv14, features = list(Extrinsic_Apoptosis_genes), name = "ExtrinsicApoptosis_score")
+slv14 <- AddModuleScore(slv14, features = list(Glycolysis), name = "Glycolysis_score")
+slv14 <- AddModuleScore(slv14, features = list(Fatty_Acid_Oxidation), name = "FAO_score")
 
-SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1", "CD8eff_score1", "MHCII_score1", "MHCI_score1", "ExtrinsicApoptosis_score1", "Glycolysis_score1", "FAO_score1"))
+SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_score1", "iNKT_score1", "MHCII_score1", "MHCI_score1", "ExtrinsicApoptosis_score1", "Glycolysis_score1", "FAO_score1"))
 
 ```
 
-#### Labeling Phenotypes of Interest
+#### Labeling Phenotypes
 
 ```{r}
-hist(obj$MHCI_score1, breaks = 50)
-hist(obj$MHCII_score1, breaks = 50)
+hist(slv14$MHCI_score1, breaks = 50)
+hist(slv14$MHCII_score1, breaks = 50)
+
+kmeans_class1 <- kmeans(slv14$MHCI_score1, centers = 2)
+kmeans_class2 <- kmeans(slv14$MHCII_score1, centers = 2)
+
+class1_cutoff <- mean(kmeans_class1$centers)
+class2_cutoff <- mean(kmeans_class2$centers)
+
+slv14$MHCI_status <- ifelse(slv14$MHCI_score1 >= class1_cutoff, "MHCI_high", "MHCI_low")
+slv14$MHCII_status <- ifelse(slv14$MHCII_score1 >= class2_cutoff, "MHCI_high", "MHCI_low")
+
+  
 ```
+
+#### Spatial Neighboring Enrichment Analysis
