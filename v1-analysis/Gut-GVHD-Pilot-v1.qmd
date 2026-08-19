@@ -24,8 +24,8 @@ library(reticulate)
 library(arrow)
 library(ggplot2)
 
-matrix_dir <- "data/SLV14/binned_outputs/square_008um/filtered_feature_bc_matrix"
-spatial_dir <- "data/SLV14/binned_outputs/square_008um/spatial"
+matrix_dir <- here::here("data", "SLV14", "binned_outputs", "square_008um", "filtered_feature_bc_matrix")
+spatial_dir <- here::here("data", "SLV14", "binned_outputs", "square_008um", "spatial")
 
 counts <- Read10X(data.dir = matrix_dir)
 
@@ -180,6 +180,35 @@ SpatialFeaturePlot(slv14, features = c("CD8eff_score1", "CD4eff_score1", "ISC_sc
 #### Labeling Phenotypes
 
 ```{r}
+# CD8 Labeling
+hist(slv14$CD8eff_score1, breaks = 50)
+kmeans_CD8 <- kmeans(slv14$CD8eff_score1, centers = 2)
+CD8_cutoff <- mean(kmeans_CD8$centers)
+
+slv14$CD8_status <- ifelse(slv14$CD8eff_score1 >= CD8_cutoff, "CD8", "non-CD8")
+
+# CD4 Labeling
+hist(slv14$CD4eff_score1, breaks = 50)
+kmeans_CD4 <- kmeans(slv14$CD4eff_score1, centers = 2)
+CD4_cutoff <- mean(kmeans_CD4$centers)
+
+slv14$CD4_status <- ifelse(slv14$CD4eff_score1 >= CD4_cutoff, "CD4", "non-CD4")
+
+# iNKT Labeling
+hist(slv14$iNKT_score1, breaks = 50)
+kmeans_iNKT <- kmeans(slv14$iNKT_score1, centers = 2)
+iNKT_cutoff <- mean(kmeans_iNKT$centers)
+
+slv14$iNKT_status <- ifelse(slv14$iNKT_score1 >= iNKT_cutoff, "iNKT", "non-iNKT")
+
+# ISC Labeling
+hist(slv14$ISC_score1, breaks = 50)
+kmeans_isc <- kmeans(slv14$ISC_score1, centers = 2)
+isc_cutoff <- mean(kmeans_isc$centers)
+
+slv14$isc_status <- ifelse(slv14$ISC_score1 >= isc_cutoff, "ISC", "non-ISC")
+
+# MHC I/II Labeling
 hist(slv14$MHCI_score1, breaks = 50)
 hist(slv14$MHCII_score1, breaks = 50)
 
@@ -190,9 +219,13 @@ class1_cutoff <- mean(kmeans_class1$centers)
 class2_cutoff <- mean(kmeans_class2$centers)
 
 slv14$MHCI_status <- ifelse(slv14$MHCI_score1 >= class1_cutoff, "MHCI_high", "MHCI_low")
-slv14$MHCII_status <- ifelse(slv14$MHCII_score1 >= class2_cutoff, "MHCI_high", "MHCI_low")
-
+slv14$MHCII_status <- ifelse(slv14$MHCII_score1 >= class2_cutoff, "MHCII_high", "MHCII_low")
   
 ```
 
-#### Spatial Neighboring Enrichment Analysis
+#### Identifying Key Cell Populations
+
+```{r}
+# Identify MHC Class II rich ISCs
+
+```
