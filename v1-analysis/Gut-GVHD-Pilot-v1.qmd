@@ -210,7 +210,7 @@ iNKT_bins <- slv14$iNKT_status == "iNKT"
 # ISC Labeling
 hist(slv14$ISC_score1, breaks = 50)
 kmeans_ISC <- kmeans(slv14$ISC_score1, centers = 2)
-ISC_cutoff <- mean(kmeans_isc$centers)
+ISC_cutoff <- mean(kmeans_ISC$centers)
 
 slv14$ISC_status <- ifelse(slv14$ISC_score1 >= ISC_cutoff, "ISC", "non-ISC")
 
@@ -225,41 +225,98 @@ hist(slv14$MHCII_score1[ISC_bins], breaks = 100)
 kmeans_ISC_MHCII <- kmeans(slv14$MHCII_score1[ISC_bins], centers = 2)
 ISC_MHCII_cutoff <- mean(kmeans_ISC_MHCII$centers)
 
-slv14$isc_mhcII_status <- ifelse(slv14$MHCII_score1 >= ISC_MHCII_cutoff, "ISC-MHCII rich", "ISC-MHCII poor")
+slv14$isc_mhcII_status <- ifelse(
+  ISC_bins,
+  ifelse(slv14$MHCII_score1 >= ISC_MHCII_cutoff, "ISC-MHCII rich", "ISC-MHCII poor"),
+  "non-ISC"
+)
 
 # Identify MHC Class I rich ISCs
 hist(slv14$MHCI_score1[ISC_bins], breaks = 100)
 kmeans_ISC_MHCI <- kmeans(slv14$MHCI_score1[ISC_bins], centers = 2)
 ISC_MHCI_cutoff <- mean(kmeans_ISC_MHCI$centers)
 
-slv14$isc_mhcI_status <- ifelse(slv14$MHCI_score1 >= ISC_MHCI_cutoff, "ISC-MHCI rich", "ISC-MHCI poor")
+slv14$isc_mhcI_status <- ifelse(
+  ISC_bins,
+  ifelse(slv14$MHCI_score1 >= ISC_MHCI_cutoff, "ISC-MHCI rich", "ISC-MHCI poor"),
+  "non-ISC"
+)
+
 
 # Identify MHC Class II rich CD4 T cells
 hist(slv14$MHCII_score1[CD4_bins], breaks = 100)
 kmeans_CD4_MHCII <- kmeans(slv14$MHCII_score1[CD4_bins], centers = 2)
 CD4_MHCII_cutoff <- mean(kmeans_CD4_MHCII$centers)
 
-slv14$CD4_mhcII_status <- ifelse(slv14$MHCII_score1 >= CD4_MHCII_cutoff, "CD4-MHCII rich", "CD4-MHCII poor")
+slv14$CD4_mhcII_status <- ifelse(
+  CD4_bins,
+  ifelse(slv14$MHCII_score1 >= CD4_MHCII_cutoff, "CD4-MHCII rich", "CD4-MHCII poor"),
+  "non-CD4"
+)
 
 # Identify MHC Class I rich CD4 T cells
 hist(slv14$MHCI_score1[CD4_bins], breaks = 100)
 kmeans_CD4_MHCI <- kmeans(slv14$MHCI_score1[CD4_bins], centers = 2)
 CD4_MHCI_cutoff <- mean(kmeans_CD4_MHCI$centers)
 
-slv14$CD4_mhcI_status <- ifelse(slv14$MHCI_score1 >= CD4_MHCI_cutoff, "CD4-MHCI rich", "CD4-MHCI poor")
+slv14$CD4_mhcI_status <- ifelse(
+  CD4_bins,
+  ifelse(slv14$MHCI_score1 >= CD4_MHCI_cutoff, "CD4-MHCI rich", "CD4-MHCI poor"),
+  "non-CD4"
+)
 
 # Identify MHC Class II rich CD8 T cells
 hist(slv14$MHCII_score1[CD8_bins], breaks = 100)
 kmeans_CD8_MHCII <- kmeans(slv14$MHCII_score1[CD8_bins], centers = 2)
 CD8_MHCII_cutoff <- mean(kmeans_CD8_MHCII$centers)
 
-slv14$CD8_mhcII_status <- ifelse(slv14$MHCII_score1 >= CD8_MHCII_cutoff, "CD8-MHCII rich", "CD8-MHCII poor")
+slv14$CD8_mhcII_status <- ifelse(
+  CD8_bins,
+  ifelse(slv14$MHCII_score1 >= CD8_MHCII_cutoff, "CD8-MHCII rich", "CD8-MHCII poor"),
+  "non-CD8"
+)
 
 # Identify MHC Class I rich CD8 T cells
 hist(slv14$MHCI_score1[CD8_bins], breaks = 100)
 kmeans_CD8_MHCI <- kmeans(slv14$MHCI_score1[CD8_bins], centers = 2)
 CD8_MHCI_cutoff <- mean(kmeans_CD8_MHCI$centers)
 
-slv14$CD8_mhcI_status <- ifelse(slv14$MHCI_score1 >= CD8_MHCI_cutoff, "CD8-MHCI rich", "CD8-MHCI poor")
+slv14$CD8_mhcI_status <- ifelse(
+  CD8_bins,
+  ifelse(slv14$MHCI_score1 >= CD8_MHCI_cutoff, "CD8-MHCI rich", "CD8-MHCI poor"),
+  "non-CD8"
+)
 
+```
+
+#### Export to AnnData for Python
+
+```{r}
+library(anndataR)
+
+pos <- positions[match(Cells(slv14), positions$barcode), ]
+
+spatial_coords <- as.matrix(
+  pos[, c("pxl_col_in_fullres", "pxl_row_in_fullres")]
+)
+
+storage.mode(spatial_coords) <- "double"
+
+adata <- as_AnnData(
+  slv14,
+  assay_name = "Spatial",
+  x_mapping = "counts",
+  layers_mapping = FALSE,
+  obs_mapping = TRUE,
+  var_mapping = FALSE,
+  obsm_mapping = FALSE,
+  obsp_mapping = FALSE,
+  uns_mapping = FALSE
+)
+
+adata$obsm <- list(
+  spatial = spatial_coords
+)
+
+adata$write_h5ad("slv14.h5ad")
 ```
