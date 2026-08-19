@@ -153,9 +153,9 @@ isc_genes <- c("LGR5","ASCL2","SMOC2","MSI1","RARRES2","SOX9","CENPM","EPHB2","O
 
 iNKT_genes <- c("CD3D","CD3E","TRAC","ZBTB16", "KLRB1","NKG7","KLRD1","GNLY")
 
-MHC_Class_II_genes = c("CD74","CIITA")
+MHC_Class_II_genes = c("CD74","CIITA","RFX5","RFXAP","RFXANK")
 
-MHC_Class_I_genes = c("B2M","TAP1","TAP2","NLRC5")
+MHC_Class_I_genes = c("B2M","TAP1","TAP2","NLRC5", "PSMB8", "PSMB9")
 
 Extrinsic_Apoptosis_genes = c("FAS","FASLG","FADD","CASP8", "TNFRSF10A","TNFRSF10B","TNFSF10","CFLAR")
 
@@ -187,12 +187,16 @@ CD8_cutoff <- mean(kmeans_CD8$centers)
 
 slv14$CD8_status <- ifelse(slv14$CD8eff_score1 >= CD8_cutoff, "CD8", "non-CD8")
 
+CD8_bins <- slv14$CD8_status == "CD8"
+
 # CD4 Labeling
 hist(slv14$CD4eff_score1, breaks = 50)
 kmeans_CD4 <- kmeans(slv14$CD4eff_score1, centers = 2)
 CD4_cutoff <- mean(kmeans_CD4$centers)
 
 slv14$CD4_status <- ifelse(slv14$CD4eff_score1 >= CD4_cutoff, "CD4", "non-CD4")
+
+CD4_bins <- slv14$CD4_status == "CD4"
 
 # iNKT Labeling
 hist(slv14$iNKT_score1, breaks = 50)
@@ -201,25 +205,16 @@ iNKT_cutoff <- mean(kmeans_iNKT$centers)
 
 slv14$iNKT_status <- ifelse(slv14$iNKT_score1 >= iNKT_cutoff, "iNKT", "non-iNKT")
 
+iNKT_bins <- slv14$isc_status == "iNKT"
+
 # ISC Labeling
 hist(slv14$ISC_score1, breaks = 50)
 kmeans_isc <- kmeans(slv14$ISC_score1, centers = 2)
 isc_cutoff <- mean(kmeans_isc$centers)
 
+ISC_bins <- slv14$isc_status == "ISC"
+
 slv14$isc_status <- ifelse(slv14$ISC_score1 >= isc_cutoff, "ISC", "non-ISC")
-
-# MHC I/II Labeling
-hist(slv14$MHCI_score1, breaks = 50)
-hist(slv14$MHCII_score1, breaks = 50)
-
-kmeans_class1 <- kmeans(slv14$MHCI_score1, centers = 2)
-kmeans_class2 <- kmeans(slv14$MHCII_score1, centers = 2)
-
-class1_cutoff <- mean(kmeans_class1$centers)
-class2_cutoff <- mean(kmeans_class2$centers)
-
-slv14$MHCI_status <- ifelse(slv14$MHCI_score1 >= class1_cutoff, "MHCI_high", "MHCI_low")
-slv14$MHCII_status <- ifelse(slv14$MHCII_score1 >= class2_cutoff, "MHCII_high", "MHCII_low")
   
 ```
 
@@ -227,5 +222,45 @@ slv14$MHCII_status <- ifelse(slv14$MHCII_score1 >= class2_cutoff, "MHCII_high", 
 
 ```{r}
 # Identify MHC Class II rich ISCs
+hist(slv14$MHCII_score1[ISC_bins], breaks = 100)
+kmeans_ISC_MHCII <- kmeans(slv14$MHCII_score1[ISC_bins], centers = 2)
+ISC_MHCII_cutoff <- mean(kmeans_ISC_MHCII$centers)
+
+slv14$isc_mhcII_status <- ifelse(slv14$MHCII_score1 >= ISC_MHCII_cutoff, "ISC-MHCII rich", "ISC-MHCII poor")
+
+# Identify MHC Class I rich ISCs
+hist(slv14$MHCI_score1[ISC_bins], breaks = 100)
+kmeans_ISC_MHCI <- kmeans(slv14$MHCI_score1[ISC_bins], centers = 2)
+ISC_MHCI_cutoff <- mean(kmeans_ISC_MHCI$centers)
+
+slv14$isc_mhcI_status <- ifelse(slv14$MHCI_score1 >= ISC_MHCI_cutoff, "ISC-MHCI rich", "ISC-MHCI poor")
+
+# Identify MHC Class II rich CD4 T cells
+hist(slv14$MHCII_score1[CD4_bins], breaks = 100)
+kmeans_CD4_MHCII <- kmeans(slv14$MHCII_score1[CD4_bins], centers = 2)
+CD4_MHCII_cutoff <- mean(kmeans_CD4_MHCII$centers)
+
+slv14$CD4_mhcII_status <- ifelse(slv14$MHCII_score1 >= CD4_MHCII_cutoff, "CD4-MHCII rich", "CD4-MHCII poor")
+
+# Identify MHC Class I rich CD4 T cells
+hist(slv14$MHCI_score1[CD4_bins], breaks = 100)
+kmeans_CD4_MHCI <- kmeans(slv14$MHCI_score1[CD4_bins], centers = 2)
+CD4_MHCI_cutoff <- mean(kmeans_CD4_MHCI$centers)
+
+slv14$CD4_mhcI_status <- ifelse(slv14$MHCI_score1 >= CD4_MHCI_cutoff, "CD4-MHCI rich", "CD4-MHCI poor")
+
+# Identify MHC Class II rich CD8 T cells
+hist(slv14$MHCII_score1[CD8_bins], breaks = 100)
+kmeans_CD8_MHCII <- kmeans(slv14$MHCII_score1[CD8_bins], centers = 2)
+CD8_MHCII_cutoff <- mean(kmeans_CD8_MHCII$centers)
+
+slv14$CD8_mhcII_status <- ifelse(slv14$MHCII_score1 >= CD8_MHCII_cutoff, "CD8-MHCII rich", "CD8-MHCII poor")
+
+# Identify MHC Class I rich CD8 T cells
+hist(slv14$MHCI_score1[CD8_bins], breaks = 100)
+kmeans_CD8_MHCI <- kmeans(slv14$MHCI_score1[CD8_bins], centers = 2)
+CD8_MHCI_cutoff <- mean(kmeans_CD8_MHCI$centers)
+
+slv14$CD8_mhcI_status <- ifelse(slv14$MHCI_score1 >= CD8_MHCI_cutoff, "CD8-MHCI rich", "CD8-MHCI poor")
 
 ```
