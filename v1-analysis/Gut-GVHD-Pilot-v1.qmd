@@ -149,7 +149,7 @@ cd8_eff_genes <- c("CD3E","CD3G","CD3D","NKG7","CST7","GZMK","GZMH","CD8A","GZMB
 
 cd4_eff_genes <- c("CD3E","CD3G","CD3D","CD40LG","CD4","TNFRSF4","IL7R","CCR4","CD28","TNF","IL2","DYNLT3","DPP4","IL4I1","CCL20")
 
-isc_genes <- c("LGR5","ASCL2","SMOC2","MSI1","RARRES2","SOX9","CENPM","EPHB2","OLFM4")
+ISC_genes <- c("LGR5","ASCL2","SMOC2","MSI1","RARRES2","SOX9","CENPM","EPHB2","OLFM4")
 
 iNKT_genes <- c("CD3D","CD3E","TRAC","ZBTB16", "KLRB1","NKG7","KLRD1","GNLY")
 
@@ -165,7 +165,7 @@ Fatty_Acid_Oxidation = c("CPT1A","CPT2","ACADM","ACADVL","HADHA","HADHB","ECHS1"
 
 slv14 <- AddModuleScore(slv14, features = list(cd8_eff_genes), name = "CD8eff_score")
 slv14 <- AddModuleScore(slv14, features = list(cd4_eff_genes), name = "CD4eff_score")
-slv14 <- AddModuleScore(slv14, features = list(isc_genes), name = "ISC_score")
+slv14 <- AddModuleScore(slv14, features = list(ISC_genes), name = "ISC_score")
 slv14 <- AddModuleScore(slv14, features = list(iNKT_genes), name = "iNKT_score")
 slv14 <- AddModuleScore(slv14, features = list(MHC_Class_II_genes), name = "MHCII_score")
 slv14 <- AddModuleScore(slv14, features = list(MHC_Class_I_genes), name = "MHCI_score")
@@ -205,17 +205,16 @@ iNKT_cutoff <- mean(kmeans_iNKT$centers)
 
 slv14$iNKT_status <- ifelse(slv14$iNKT_score1 >= iNKT_cutoff, "iNKT", "non-iNKT")
 
-iNKT_bins <- slv14$isc_status == "iNKT"
+iNKT_bins <- slv14$iNKT_status == "iNKT"
 
 # ISC Labeling
 hist(slv14$ISC_score1, breaks = 50)
-kmeans_isc <- kmeans(slv14$ISC_score1, centers = 2)
-isc_cutoff <- mean(kmeans_isc$centers)
+kmeans_ISC <- kmeans(slv14$ISC_score1, centers = 2)
+ISC_cutoff <- mean(kmeans_isc$centers)
 
-ISC_bins <- slv14$isc_status == "ISC"
+slv14$ISC_status <- ifelse(slv14$ISC_score1 >= ISC_cutoff, "ISC", "non-ISC")
 
-slv14$isc_status <- ifelse(slv14$ISC_score1 >= isc_cutoff, "ISC", "non-ISC")
-  
+ISC_bins <- slv14$ISC_status == "ISC"
 ```
 
 #### Identifying Key Cell Populations
