@@ -225,7 +225,7 @@ hist(slv14$MHCII_score1[ISC_bins], breaks = 100)
 kmeans_ISC_MHCII <- kmeans(slv14$MHCII_score1[ISC_bins], centers = 2)
 ISC_MHCII_cutoff <- mean(kmeans_ISC_MHCII$centers)
 
-slv14$isc_mhcII_status <- ifelse(
+slv14$ISC_MHCII_status <- ifelse(
   ISC_bins,
   ifelse(slv14$MHCII_score1 >= ISC_MHCII_cutoff, "ISC-MHCII rich", "ISC-MHCII poor"),
   "non-ISC"
@@ -236,7 +236,7 @@ hist(slv14$MHCI_score1[ISC_bins], breaks = 100)
 kmeans_ISC_MHCI <- kmeans(slv14$MHCI_score1[ISC_bins], centers = 2)
 ISC_MHCI_cutoff <- mean(kmeans_ISC_MHCI$centers)
 
-slv14$isc_mhcI_status <- ifelse(
+slv14$ISC_MHCI_status <- ifelse(
   ISC_bins,
   ifelse(slv14$MHCI_score1 >= ISC_MHCI_cutoff, "ISC-MHCI rich", "ISC-MHCI poor"),
   "non-ISC"
@@ -248,7 +248,7 @@ hist(slv14$MHCII_score1[CD4_bins], breaks = 100)
 kmeans_CD4_MHCII <- kmeans(slv14$MHCII_score1[CD4_bins], centers = 2)
 CD4_MHCII_cutoff <- mean(kmeans_CD4_MHCII$centers)
 
-slv14$CD4_mhcII_status <- ifelse(
+slv14$CD4_MHCII_status <- ifelse(
   CD4_bins,
   ifelse(slv14$MHCII_score1 >= CD4_MHCII_cutoff, "CD4-MHCII rich", "CD4-MHCII poor"),
   "non-CD4"
@@ -270,7 +270,7 @@ hist(slv14$MHCII_score1[CD8_bins], breaks = 100)
 kmeans_CD8_MHCII <- kmeans(slv14$MHCII_score1[CD8_bins], centers = 2)
 CD8_MHCII_cutoff <- mean(kmeans_CD8_MHCII$centers)
 
-slv14$CD8_mhcII_status <- ifelse(
+slv14$CD8_MHCII_status <- ifelse(
   CD8_bins,
   ifelse(slv14$MHCII_score1 >= CD8_MHCII_cutoff, "CD8-MHCII rich", "CD8-MHCII poor"),
   "non-CD8"
@@ -281,7 +281,7 @@ hist(slv14$MHCI_score1[CD8_bins], breaks = 100)
 kmeans_CD8_MHCI <- kmeans(slv14$MHCI_score1[CD8_bins], centers = 2)
 CD8_MHCI_cutoff <- mean(kmeans_CD8_MHCI$centers)
 
-slv14$CD8_mhcI_status <- ifelse(
+slv14$CD8_MHCI_status <- ifelse(
   CD8_bins,
   ifelse(slv14$MHCI_score1 >= CD8_MHCI_cutoff, "CD8-MHCI rich", "CD8-MHCI poor"),
   "non-CD8"
