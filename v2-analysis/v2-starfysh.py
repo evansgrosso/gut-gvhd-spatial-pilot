@@ -1,18 +1,13 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# In[10]:
-
-
+import os
 import anndata as ad
 import pandas as pd
 import scanpy as sc
 import numpy as np
 import json
-
 from skimage import io
 from starfysh import utils
-
+from starfysh.starfysh import model_eval
 import inspect
 print(inspect.getsource(utils.run_starfysh))
 
@@ -20,10 +15,6 @@ adata_raw = sc.read_h5ad("../v2-analysis/slv14.h5ad")
 adata_raw
 
 print(adata_raw)
-
-
-# In[11]:
-
 
 adata = adata_raw.copy()
 
@@ -45,19 +36,12 @@ sc.pp.highly_variable_genes(
 )
 
 
-# In[12]:
-
-
 adata_raw = adata_raw[
     adata.obs_names,
     adata.var_names
 ].copy()
 
 adata_raw.var["highly_variable"] = adata.var["highly_variable"]
-
-
-# In[13]:
-
 
 gene_sig = pd.read_csv(
     "../v2-analysis/GVHD_spatial_signature.csv"
@@ -71,9 +55,6 @@ for column in gene_sig.columns:
     )
 
 gene_sig
-
-
-# In[17]:
 
 
 spatial_dir = "../data/SLV14/binned_outputs/square_016um/spatial"
@@ -130,9 +111,6 @@ args = utils.VisiumArguments(
 )
 
 
-# In[ ]:
-
-
 anchors = args.get_anchors()
 anchors.head()
 
@@ -140,19 +118,12 @@ anchors.notna().sum()
 
 import inspect
 
-
 print(inspect.signature(utils.run_starfysh))
-
-
-# In[21]:
-
 
 import torch
 
-# Use CPU for compatibility
 device = torch.device("cpu")
 
-# Fix Starfysh / SciPy sparse-matrix compatibility
 if not isinstance(args.adata.X, np.ndarray):
     args.adata.X = args.adata.X.toarray()
 
@@ -160,7 +131,7 @@ if not isinstance(args.adata_norm.X, np.ndarray):
     args.adata_norm.X = args.adata_norm.X.toarray()
 
 # Run Starfysh
-model, losses, adata_out = utils.run_starfysh(
+model, loss = utils.run_starfysh(
     args,
     n_repeats=3,
     lr=1e-4,
@@ -173,18 +144,25 @@ model, losses, adata_out = utils.run_starfysh(
     verbose=True
 )
 
-
-# In[ ]:
-
+inference_outputs, generative_outputs, adata_out = model_eval(
+    model,
+    args.adata,
+    args,
+    poe=False,
+    device=device
+)
 
 print(adata_out)
 print(adata_out.obs.columns.tolist())
 print(adata_out.obsm.keys())
 print(adata_out.uns.keys())
 
+# Persist results
+out_dir = os.path.join("outputs", "SLV14")
+os.makedirs(out_dir, exist_ok=True)
 
-# In[ ]:
+adata_out.write(os.path.join(out_dir, "adata_out.h5ad"))
+torch.save(model.state_dict(), os.path.join(out_dir, "model.pt"))
 
-
-
-
+with open(os.path.join(out_dir, "losses.json"), "w") as f:
+    json.dump(loss, f)
