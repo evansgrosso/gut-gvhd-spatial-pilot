@@ -1,4 +1,5 @@
 data/
+v2-analysis/outputs/
 *.h5ad
 *.h5
 *.mtx
