@@ -93,6 +93,7 @@ dim(slv14)
 ```{r}
 library(anndataR)
 
+positions <- read_parquet(file.path(spatial_dir, "tissue_positions.parquet"))
 pos <- positions[match(Cells(slv14), positions$barcode), ]
 
 spatial_coords <- as.matrix(
