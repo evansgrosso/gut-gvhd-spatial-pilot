@@ -13,6 +13,9 @@ import json
 from skimage import io
 from starfysh import utils
 
+import inspect
+print(inspect.getsource(utils.run_starfysh))
+
 adata_raw = sc.read_h5ad("../v2-analysis/slv14.h5ad")
 adata_raw
 
