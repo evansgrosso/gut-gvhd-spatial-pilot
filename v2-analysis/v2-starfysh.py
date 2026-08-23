@@ -11,7 +11,7 @@ from starfysh.starfysh import model_eval
 import inspect
 print(inspect.getsource(utils.run_starfysh))
 
-adata_raw = sc.read_h5ad("../v2-analysis/slv14.h5ad")
+adata_raw = sc.read_h5ad("v2-analysis/slv14.h5ad")
 adata_raw
 
 print(adata_raw)
@@ -44,7 +44,7 @@ adata_raw = adata_raw[
 adata_raw.var["highly_variable"] = adata.var["highly_variable"]
 
 gene_sig = pd.read_csv(
-    "../v2-analysis/GVHD_spatial_signature.csv"
+    "v2-analysis/GVHD_spatial_signature.csv"
 )
 
 gene_sig.head()
@@ -57,7 +57,7 @@ for column in gene_sig.columns:
 gene_sig
 
 
-spatial_dir = "../data/SLV14/binned_outputs/square_016um/spatial"
+spatial_dir = "data/SLV14/binned_outputs/square_016um/spatial"
 
 positions = pd.read_parquet(
     f"{spatial_dir}/tissue_positions.parquet"
@@ -133,9 +133,9 @@ if not isinstance(args.adata_norm.X, np.ndarray):
 # Run Starfysh
 model, loss = utils.run_starfysh(
     args,
-    n_repeats=3,
+    n_repeats=1,
     lr=1e-4,
-    epochs=100,
+    epochs=2,
     batch_size=32,
     alpha_mul=50,
     poe=False,
@@ -144,13 +144,14 @@ model, loss = utils.run_starfysh(
     verbose=True
 )
 
-inference_outputs, generative_outputs, adata_out = model_eval(
+inference_outputs, generative_outputs = model_eval(
     model,
     args.adata,
     args,
     poe=False,
     device=device
 )
+adata_out = args.adata
 
 print(adata_out)
 print(adata_out.obs.columns.tolist())
@@ -158,7 +159,7 @@ print(adata_out.obsm.keys())
 print(adata_out.uns.keys())
 
 # Persist results
-out_dir = os.path.join("outputs", "SLV14")
+out_dir = os.path.join("v2-analysis", "outputs", "SLV14")
 os.makedirs(out_dir, exist_ok=True)
 
 adata_out.write(os.path.join(out_dir, "adata_out.h5ad"))
