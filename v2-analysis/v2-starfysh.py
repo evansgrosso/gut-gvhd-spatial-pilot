@@ -133,9 +133,9 @@ if not isinstance(args.adata_norm.X, np.ndarray):
 # Run Starfysh
 model, loss = utils.run_starfysh(
     args,
-    n_repeats=1,
+    n_repeats=3,
     lr=1e-4,
-    epochs=2,
+    epochs=100,
     batch_size=32,
     alpha_mul=50,
     poe=False,
