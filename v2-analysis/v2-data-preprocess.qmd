@@ -1,0 +1,121 @@
+---
+  title: "Gut GVHD Pilot"
+format:
+  html:
+  embed-resources: true
+editor: visual
+execute:
+  echo: true
+output: true
+warning: false
+message: false
+---
+
+\#### Data Loading
+
+Sample SLV14 was chosen because it is an example of severe GVHD.
+
+In v1, 8 um resolution was used.
+
+```{r}
+library(Seurat)
+library(dplyr)
+library(reticulate)
+library(arrow)
+library(ggplot2)
+
+matrix_dir <- here::here("data", "SLV14", "binned_outputs", "square_016um", "filtered_feature_bc_matrix")
+spatial_dir <- here::here("data", "SLV14", "binned_outputs", "square_016um", "spatial")
+
+counts <- Read10X(data.dir = matrix_dir)
+slv14 <- CreateSeuratObject(counts, assay = "Spatial", project = "SLV14")
+slv14 <- subset(slv14, subset = nCount_Spatial >= 50)
+
+img <- Read10X_Image(image.dir = spatial_dir, image.name = "tissue_lowres_image.png")
+img <- img[Cells(slv14)]
+DefaultAssay(img) <- "Spatial"
+slv14[["slice1"]] <- img  # attach image to the object
+
+slv14
+
+SpatialFeaturePlot(
+  slv14,
+  features = "nCount_Spatial",
+  pt.size.factor = 1
+)
+```
+
+#### Data Quality Control
+
+I used Median Absolute Deviations as my standard for filtering spots. Data points above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.
+
+```{r}
+
+slv14[["percent.mt"]] <- PercentageFeatureSet(slv14, pattern = "^MT-")
+
+VlnPlot(slv14, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"))
+FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+
+log_count <- log1p(slv14$nCount_Spatial)
+med_count <- median(log_count)
+mad_val_count <- mad(log_count)
+
+count_lower_log <- (med_count - (mad_val_count*3))
+count_upper_log <- (med_count + (mad_val_count*3))
+
+count_lower <- expm1(count_lower_log)
+count_upper <- expm1(count_upper_log)
+
+log_feature <- log1p(slv14$nFeature_Spatial)
+med_feature <- median(log_feature)
+mad_val_feature <- mad(log_feature)
+
+feature_lower_log <- (med_feature - (mad_val_feature*3))
+feature_upper_log <- (med_feature + (mad_val_feature*3))
+
+feature_lower <- expm1(feature_lower_log)
+feature_upper <- expm1(feature_upper_log)
+
+mt_upper = median(slv14$percent.mt) + (3 * mad(slv14$percent.mt))
+
+dim(slv14)
+
+slv14 <- subset(slv14, subset = nCount_Spatial < count_upper & nCount_Spatial > count_lower & nFeature_Spatial > feature_lower & nFeature_Spatial < feature_upper & percent.mt < mt_upper)
+
+VlnPlot(slv14, features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"))
+FeatureScatter(slv14, feature1 = "nCount_Spatial", feature2 = "nFeature_Spatial")
+
+dim(slv14)
+```
+
+#### Export to AnnData for Python
+
+```{r}
+library(anndataR)
+
+pos <- positions[match(Cells(slv14), positions$barcode), ]
+
+spatial_coords <- as.matrix(
+  pos[, c("pxl_col_in_fullres", "pxl_row_in_fullres")]
+)
+
+storage.mode(spatial_coords) <- "double"
+
+adata <- as_AnnData(
+  slv14,
+  assay_name = "Spatial",
+  x_mapping = "counts",
+  layers_mapping = FALSE,
+  obs_mapping = TRUE,
+  var_mapping = FALSE,
+  obsm_mapping = FALSE,
+  obsp_mapping = FALSE,
+  uns_mapping = FALSE
+)
+
+adata$obsm <- list(
+  spatial = spatial_coords
+)
+
+adata$write_h5ad("slv14.h5ad")
+```
