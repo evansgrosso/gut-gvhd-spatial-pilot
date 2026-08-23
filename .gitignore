@@ -9,4 +9,5 @@ v2-analysis/outputs/
 .Rproj.user/
 .Rhistory
 .RData
+.vscode
 developer-notes.md
