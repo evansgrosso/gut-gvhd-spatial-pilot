@@ -16,6 +16,24 @@ PANELS = {
 
 SCALE_FACTOR = 0.5097273  # tissue_hires_scalef
 
+# Region boundaries taken directly from the reference paper's own hand-drawn
+# bounding boxes for SLV14 (CellphoneDB_Analysis.ipynb), in hires-image pixel
+# space. Each box is (y_min, y_max, x_min, x_max).
+CRYPT_LOSS_BOXES = [
+    (2300, 2900, 1000, 1400),
+    (1800, 2000, 1600, 2100),
+]
+CRYPT_INTACT_BOXES = [
+    (1400, 1800, 1700, 2300),
+]
+
+
+def _in_boxes(x, y, boxes):
+    mask = pd.Series(False, index=x.index)
+    for y0, y1, x0, x1 in boxes:
+        mask |= (y >= y0) & (y <= y1) & (x >= x0) & (x <= x1)
+    return mask
+
 
 def load_combined():
     """Load Starfysh output + signature scores into one per-spot DataFrame.
@@ -49,16 +67,8 @@ def load_combined():
     combined["img_x"] = combined["spatial_x"] * SCALE_FACTOR
     combined["img_y"] = combined["spatial_y"] * SCALE_FACTOR
 
-    # Region boundaries taken directly from the reference paper's own hand-drawn
-    # bounding boxes for SLV14 (CellphoneDB_Analysis.ipynb), in hires-image pixel space
-    combined["crypt_loss"] = (
-        (combined["img_y"] >= 2300) & (combined["img_y"] <= 2900) & (combined["img_x"] >= 1000) & (combined["img_x"] <= 1400)
-    ) | (
-        (combined["img_y"] >= 1800) & (combined["img_y"] <= 2000) & (combined["img_x"] >= 1600) & (combined["img_x"] <= 2100)
-    )
-    combined["crypt_intact"] = (
-        (combined["img_y"] >= 1400) & (combined["img_y"] <= 1800) & (combined["img_x"] >= 1700) & (combined["img_x"] <= 2300)
-    )
+    combined["crypt_loss"] = _in_boxes(combined["img_x"], combined["img_y"], CRYPT_LOSS_BOXES)
+    combined["crypt_intact"] = _in_boxes(combined["img_x"], combined["img_y"], CRYPT_INTACT_BOXES)
 
     isc_prop = combined["Intestine Epithelial Stem cells"].values.reshape(-1, 1)
     km_isc = KMeans(n_clusters=2, n_init=10, random_state=0).fit(isc_prop)
