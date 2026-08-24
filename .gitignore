@@ -10,4 +10,5 @@ v2-analysis/outputs/
 .Rhistory
 .RData
 .vscode
+.html
 developer-notes.md
