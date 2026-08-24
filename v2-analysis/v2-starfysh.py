@@ -9,7 +9,6 @@ from skimage import io
 from starfysh import utils
 from starfysh.starfysh import model_eval
 import inspect
-print(inspect.getsource(utils.run_starfysh))
 
 adata_raw = sc.read_h5ad("v2-analysis/slv14.h5ad")
 adata_raw
@@ -124,11 +123,7 @@ import torch
 
 device = torch.device("cpu")
 
-if not isinstance(args.adata.X, np.ndarray):
-    args.adata.X = args.adata.X.toarray()
-
-if not isinstance(args.adata_norm.X, np.ndarray):
-    args.adata_norm.X = args.adata_norm.X.toarray()
+args.adata.X = args.adata.X.toarray()
 
 # Run Starfysh
 model, loss = utils.run_starfysh(

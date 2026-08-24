@@ -289,6 +289,39 @@ slv14$CD8_MHCI_status <- ifelse(
 
 ```
 
+#### Correlation Check
+
+```{r}
+pos <- positions[match(Cells(slv14), positions$barcode), ]
+
+scale_factor <- 0.5097273  # tissue_hires_scalef, same value used in the v2 validation
+
+img_x <- pos$pxl_col_in_fullres * scale_factor
+img_y <- pos$pxl_row_in_fullres * scale_factor
+
+crypt_loss_mask <- (
+  (img_y >= 2300 & img_y <= 2900 & img_x >= 1000 & img_x <= 1400) |
+    (img_y >= 1800 & img_y <= 2000 & img_x >= 1600 & img_x <= 2100)
+)
+
+crypt_intact_mask <- (
+  img_y >= 1400 & img_y <= 1800 & img_x >= 1700 & img_x <= 2300
+)
+
+cat("Crypt-loss spots:", sum(crypt_loss_mask), "\n")
+cat("Crypt-intact spots:", sum(crypt_intact_mask), "\n")
+
+cat("\nCD8eff_score1\n")
+cat("  crypt-loss mean:  ", mean(slv14$CD8eff_score1[crypt_loss_mask]), "\n")
+cat("  crypt-intact mean:", mean(slv14$CD8eff_score1[crypt_intact_mask]), "\n")
+print(wilcox.test(slv14$CD8eff_score1[crypt_loss_mask], slv14$CD8eff_score1[crypt_intact_mask]))
+
+cat("\nISC_score1\n")
+cat("  crypt-loss mean:  ", mean(slv14$ISC_score1[crypt_loss_mask]), "\n")
+cat("  crypt-intact mean:", mean(slv14$ISC_score1[crypt_intact_mask]), "\n")
+print(wilcox.test(slv14$ISC_score1[crypt_loss_mask], slv14$ISC_score1[crypt_intact_mask]))
+```
+
 #### Export to AnnData for Python
 
 ```{r}

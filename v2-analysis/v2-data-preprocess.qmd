@@ -11,11 +11,7 @@ warning: false
 message: false
 ---
 
-\#### Data Loading
-
-Sample SLV14 was chosen because it is an example of severe GVHD.
-
-In v1, 8 um resolution was used.
+#### Data Loading
 
 ```{r}
 library(Seurat)
@@ -46,8 +42,6 @@ SpatialFeaturePlot(
 ```
 
 #### Data Quality Control
-
-I used Median Absolute Deviations as my standard for filtering spots. Data points above/below 3 MADs for any of the criterion (features, counts, percent.mt) were excluded from the dataset.
 
 ```{r}
 
