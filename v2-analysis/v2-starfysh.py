@@ -12,7 +12,7 @@ from starfysh.starfysh import model_eval
 import inspect
 
 # Define configuration constants: sample list, data root, output directory.
-SAMPLES = ["SLV14", "SLV12"]
+SAMPLES = ["SLV11", "SLV12", "SLV13", "SLV14", "SLV15", "SLV16", "SLV17", "SLV18"]
 DATA_ROOT = "data"
 OUT_DIR = os.path.join("v2-analysis", "outputs", "integrated")
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -139,9 +139,9 @@ args.adata.X = args.adata.X.toarray()
 # Run Starfysh training
 model, loss = utils_integrate.run_starfysh(
     args,
-    n_repeats=1,        # Paper's value: 3 independent training runs
+    n_repeats=3,        # Paper's value: 3 independent training runs
     lr=1e-4,            # Paper's value: learning rate
-    epochs=5,         # Paper's value: max epochs per run
+    epochs=100,         # Paper's value: max epochs per run
     batch_size=32,      # Paper's value: batch size
     alpha_mul=50,       # Paper's value: annealing schedule multiplier
     poe=False,          # Paper's value: no image integration (PoE) for this dataset
