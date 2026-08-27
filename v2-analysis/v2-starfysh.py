@@ -5,160 +5,167 @@ import pandas as pd
 import scanpy as sc
 import numpy as np
 import json
+from types import SimpleNamespace
 from skimage import io
-from starfysh import utils
+from starfysh import utils, utils_integrate
 from starfysh.starfysh import model_eval
 import inspect
 
-adata_raw = sc.read_h5ad("v2-analysis/slv14.h5ad")
-adata_raw
+# Define configuration constants: sample list, data root, output directory.
+SAMPLES = ["SLV14", "SLV12"]
+DATA_ROOT = "data"
+OUT_DIR = os.path.join("v2-analysis", "outputs", "integrated")
+os.makedirs(OUT_DIR, exist_ok=True)
 
-print(adata_raw)
+# Load spatial signature csv file.
+gene_sig = pd.read_csv("v2-analysis/GVHD_spatial_signature.csv")
 
-adata = adata_raw.copy()
-
-# Remove mitochondrial and ribosomal genes
-mt = adata.var_names.str.startswith("MT-")
-rb = adata.var_names.str.startswith("RP")
-
-adata = adata[:, ~(mt | rb)].copy()
-
-# Normalize and log-transform
-sc.pp.normalize_total(adata)
-sc.pp.log1p(adata)
-
-# Identify highly variable genes
-sc.pp.highly_variable_genes(
-    adata,
-    flavor="seurat",
-    n_top_genes=2000
-)
+# Define variables to store intermediary data
+raw_list, norm_list, img_metadata = [], [], {}
 
 
-adata_raw = adata_raw[
-    adata.obs_names,
-    adata.var_names
-].copy()
+for sid in SAMPLES:    
+    # Read the h5ad file produced by QC script
+    a = sc.read_h5ad(f"{DATA_ROOT}/{sid.lower()}.h5ad")
+    
+    # Make barcodes unique by appending sample ID
+    a.obs_names = [f"{bc}_{sid}" for bc in a.obs_names]
+    
+    # Tags which sample each spot came from.
+    a.obs["sample"] = sid
+    
+    # Remove mitochondrial and ribosomal genes.
+    mt = a.var_names.str.startswith(("MT-", "mt-"))
+    rb = a.var_names.str.startswith(("RP-", "rp-"))
+    a = a[:, ~(mt | rb)].copy()
+    
+    # Create normalized copy for HVG selection
+    n = a.copy()
+    sc.pp.normalize_total(n)
+    sc.pp.log1p(n)
+    
+    # Store raw and normalized versions
+    raw_list.append(a)
+    norm_list.append(n)
+    
+    # Load spatial metadata and attach it for this sample
+    spatial_dir = f"{DATA_ROOT}/{sid}/binned_outputs/square_016um/spatial"
+    
+    # Read tissue positions
+    positions = pd.read_parquet(f"{spatial_dir}/tissue_positions.parquet")
+    
+    # Update barcodes in positions
+    positions["barcode"] = positions["barcode"].astype(str) + f"_{sid}"
+    
+    # Subset to only spots in the current sample
+    positions = positions.set_index("barcode").loc[a.obs_names].copy()
+    
+    # Extract and rename spatial coordinates to match Starfysh's expected format
+    map_info = positions[["array_row", "array_col",
+                          "pxl_col_in_fullres", "pxl_row_in_fullres"]].copy()
+    map_info.columns = ["array_row", "array_col", "imagecol", "imagerow"]
+    
+    # Load scale factors
+    with open(f"{spatial_dir}/scalefactors_json.json") as f:
+        scalefactor = json.load(f)
+    
+    # Load H&E image
+    img = io.imread(f"{spatial_dir}/tissue_hires_image.png")
+    
+    # Store all metadata for this sample, keyed by sample ID
+    img_metadata[sid] = {
+        "map_info": map_info,
+        "scalefactor": scalefactor,
+        "img": img,
+    }
 
-adata_raw.var["highly_variable"] = adata.var["highly_variable"]
+# Concatenate all raw data vertically (union of genes across samples)
+adata_raw_all = ad.concat(raw_list, axis=0, join="inner")
+adata_norm_all = ad.concat(norm_list, axis=0, join="inner")
+del raw_list, norm_list  # Free RAM
 
-gene_sig = pd.read_csv(
-    "v2-analysis/GVHD_spatial_signature.csv"
-)
+# Select HVGs accounting for differences in each batch.
+sc.pp.highly_variable_genes(adata_norm_all, flavor="seurat",
+                            n_top_genes=2000, batch_key="sample")
 
-gene_sig.head()
+# Flag raw data with HVG tags
+adata_raw_all.var["highly_variable"] = adata_norm_all.var["highly_variable"].values
 
-for column in gene_sig.columns:
-    gene_sig[column] = gene_sig[column].where(
-        gene_sig[column].isin(adata.var_names)
+# Filter gene signatures to only HVGs
+for col in gene_sig.columns:
+    gene_sig[col] = gene_sig[col].where(gene_sig[col].isin(adata_norm_all.var_names))
+    
+# Split data back to per-sample.
+print("[Step 3] Splitting back to per-sample subsets...", flush=True)
+
+per_raw = {s: adata_raw_all[adata_raw_all.obs["sample"] == s].copy() for s in SAMPLES}
+per_norm = {s: adata_norm_all[adata_norm_all.obs["sample"] == s].copy() for s in SAMPLES}
+
+# STEP 4: Build per-sample VisiumArguments (within-sample signature scoring)
+individual_args = {}
+for sid in SAMPLES:
+    va = utils.VisiumArguments(
+        per_raw[sid],
+        per_norm[sid],
+        gene_sig,
+        img_metadata[sid],
+        sample_id=sid,
+        window_size=3,      # Paper's default
+        patch_r=13,         # Paper's default
     )
 
-gene_sig
+    # Extract the signature scores (the integrate wrapper concatenates these)
+    individual_args[sid] = SimpleNamespace(
+        sig_mean=va.sig_mean,
+        sig_mean_norm=va.sig_mean_norm
+    )
+    del va  # Free RAM
 
-
-spatial_dir = "data/SLV14/binned_outputs/square_016um/spatial"
-
-positions = pd.read_parquet(
-    f"{spatial_dir}/tissue_positions.parquet"
-)
-
-with open(f"{spatial_dir}/scalefactors_json.json") as f:
-    scalefactor = json.load(f)
-
-img = io.imread(
-    f"{spatial_dir}/tissue_hires_image.png"
-)
-
-positions = positions.set_index("barcode")
-positions = positions.loc[adata.obs_names].copy()
-
-positions.head()
-
-map_info = positions[
-    [
-        "array_row",
-        "array_col",
-        "pxl_col_in_fullres",
-        "pxl_row_in_fullres"
-    ]
-].copy()
-
-map_info.columns = [
-    "array_row",
-    "array_col",
-    "imagecol",
-    "imagerow"
-]
-
-img_metadata = {
-    "map_info": map_info,
-    "scalefactor": scalefactor,
-    "img": img
-}
-
-print(map_info.shape)
-print(adata.shape)
-print(img.shape)
-print(scalefactor)
-
-args = utils.VisiumArguments(
-    adata_raw,
-    adata,
+# Defines Starfysh arguments
+args = utils_integrate.VisiumArguments_integrate(
+    adata_raw_all,
+    adata_norm_all,
     gene_sig,
     img_metadata,
-    sample_id="SLV14"
+    individual_args,
+    sample_id=SAMPLES,
+    window_size=3,
+    patch_r=13,
 )
 
-
-anchors = args.get_anchors()
-anchors.head()
-
-anchors.notna().sum()
-
-import inspect
-
-print(inspect.signature(utils.run_starfysh))
-
-import torch
-
-device = torch.device("cpu")
-
+# Convert to dense matrix
 args.adata.X = args.adata.X.toarray()
 
-# Run Starfysh
-model, loss = utils.run_starfysh(
+# Run Starfysh training
+model, loss = utils_integrate.run_starfysh(
     args,
-    n_repeats=3,
-    lr=1e-4,
-    epochs=100,
-    batch_size=32,
-    alpha_mul=50,
-    poe=False,
-    device=device,
-    seed=0,
-    verbose=True
+    n_repeats=1,        # Paper's value: 3 independent training runs
+    lr=1e-4,            # Paper's value: learning rate
+    epochs=5,         # Paper's value: max epochs per run
+    batch_size=32,      # Paper's value: batch size
+    alpha_mul=50,       # Paper's value: annealing schedule multiplier
+    poe=False,          # Paper's value: no image integration (PoE) for this dataset
+    device= "cpu",
+    verbose=True,       # Print progress
 )
 
+# Extract deconvoluted spot proportions
 inference_outputs, generative_outputs = model_eval(
     model,
     args.adata,
     args,
     poe=False,
-    device=device
+    device="cpu",
 )
+
 adata_out = args.adata
 
-print(adata_out)
-print(adata_out.obs.columns.tolist())
-print(adata_out.obsm.keys())
-print(adata_out.uns.keys())
+# Save the annotated data with proportions
+adata_out.write(os.path.join(OUT_DIR, "adata_out.h5ad"))
 
-# Persist results
-out_dir = os.path.join("v2-analysis", "outputs", "SLV14")
-os.makedirs(out_dir, exist_ok=True)
+# Save the trained model weights
+torch.save(model.state_dict(), os.path.join(OUT_DIR, "model.pt"))
 
-adata_out.write(os.path.join(out_dir, "adata_out.h5ad"))
-torch.save(model.state_dict(), os.path.join(out_dir, "model.pt"))
-
-with open(os.path.join(out_dir, "losses.json"), "w") as f:
+# Save training losses for diagnostics
+with open(os.path.join(OUT_DIR, "losses.json"), "w") as f:
     json.dump(loss, f)
