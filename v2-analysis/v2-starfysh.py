@@ -4,6 +4,7 @@ import anndata as ad
 import pandas as pd
 import scanpy as sc
 import numpy as np
+import torch
 import json
 from types import SimpleNamespace
 from skimage import io
@@ -96,8 +97,6 @@ for col in gene_sig.columns:
     gene_sig[col] = gene_sig[col].where(gene_sig[col].isin(adata_norm_all.var_names))
     
 # Split data back to per-sample.
-print("[Step 3] Splitting back to per-sample subsets...", flush=True)
-
 per_raw = {s: adata_raw_all[adata_raw_all.obs["sample"] == s].copy() for s in SAMPLES}
 per_norm = {s: adata_norm_all[adata_norm_all.obs["sample"] == s].copy() for s in SAMPLES}
 
