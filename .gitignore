@@ -11,4 +11,6 @@ v2-analysis/outputs/
 .RData
 .vscode
 .html
+__pycache__
+methodology-notes.md
 developer-notes.md

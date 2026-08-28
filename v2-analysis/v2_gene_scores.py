@@ -65,13 +65,33 @@ PANELS = {
     "IFN_gamma": ["STAT1", "IRF1", "GBP1", "GBP2", "CXCL9", "CXCL10"],
 }
 
-# Cell types that cannot exist in this tissue; dropped before renormalizing.
-STOMACH = ["Stomach Epithelial cells", "Stomach Stem cells",
-           "Stomach Body Epithelial cells"]
-ISC = "Intestine Epithelial Stem cells"
-# Spelled as in GVHD_spatial_signature.csv. Enterocyte is deliberately not
-# summed in: that signature is small-intestinal and this tissue is rectum.
-IEC = "Instestinal Epithelial cells"
+# Sample metadata, from the reference repo's integration notebook. Half these
+# samples are gastric, so the stomach cell types are real tissue here and must
+# not be treated as contamination.
+META = pd.DataFrame(
+    [["SLV11", "C159",  "Antrum",          "Severe"],
+     ["SLV12", "C162",  "Rectum",          "Mild"],
+     ["SLV13", "C98",   "Stomach_Body",    "Severe"],
+     ["SLV14", "C159",  "Rectum",          "Severe"],
+     ["SLV15", "C179",  "Antrum",          "Mild"],
+     ["SLV16", "C179",  "Ascending_Colon", "Mild"],
+     ["SLV17", "ND001", "Ascending_Colon", "ND"],
+     ["SLV18", "C162",  "Stomach",         "Mild"]],
+    columns=["sample", "patient", "tissue_type", "grade"]).set_index("sample")
+
+GASTRIC = ["Antrum", "Stomach_Body", "Stomach"]
+
+# Cell-type names spelled as in GVHD_spatial_signature.csv.
+# Stem is pooled across both tissues, as the reference does
+# (stem_cell_types = ['Intestine_Epithelial Stem cell', 'Stomach_stem_cells']).
+STEM = ["Intestine Epithelial Stem cells", "Stomach Stem cells"]
+EPITHELIUM = STEM + ["Instestinal Epithelial cells",
+                     "Stomach Epithelial cells",
+                     "Stomach Body Epithelial cells"]
+# Excluded everywhere. The Enterocyte signature is small-intestinal (SI, FABP2,
+# RBP2, CCL25) and none of these 8 samples are small intestine -- they are
+# antrum, stomach, stomach body, rectum, and ascending colon.
+ENTEROCYTE = "Enterocyte"
 
 
 def load_starfysh_proportions(path):
@@ -110,7 +130,7 @@ def load_starfysh_proportions(path):
             node = obs[key]
             if isinstance(node, h5py.Dataset) and node.dtype.kind == "f":
                 num_cols[key] = node[:]
-        hits = [k for k in num_cols if k in STOMACH or k in (ISC, IEC)
+        hits = [k for k in num_cols if k in EPITHELIUM or k == ENTEROCYTE
                 or "cell" in k.lower() or "T cells" in k]
         if hits:
             print(f"  proportions from {len(num_cols)} obs columns")
@@ -295,25 +315,34 @@ for name in scores.columns:
     print(f"  {name:18s} {within(scores, name):+12.3f} "
           f"{within(scores_adj, name + '_dadj'):+10.3f}")
 
-# Drop the impossible categories and renormalize, so proportions still sum to 1.
-drop = [c for c in prop.columns if c in STOMACH]
-if drop:
-    prop = prop.drop(columns=drop)
-    print(f"Dropped non-rectal categories: {drop}")
-prop = prop.div(prop.sum(1), axis=0)
-
 out = pd.concat([scores, scores_adj, prop.add_prefix("prop_")], axis=1)
 out["sample"] = samples
 out["depth"] = depth.values
 
-# Stem fraction within epithelium. Using the ratio rather than the raw ISC
-# proportion sidesteps the compositional problem: proportions are constrained
-# to sum to 1, so a raw proportion moves when any other cell type moves.
-if ISC in prop.columns and IEC in prop.columns:
-    denom = prop[ISC] + prop[IEC]
-    out["stem_fraction"] = np.where(denom > 0, prop[ISC] / denom, np.nan)
+# Sample-level metadata. grade_group collapses Mild and ND into one arm, the
+# same split the reference uses (df_ND['Grade'] = 'mild/no').
+for col in ("patient", "tissue_type", "grade"):
+    out[col] = META[col].reindex(samples).values
+out["grade_group"] = np.where(out["grade"] == "Severe", "severe", "mild_no")
+out["tissue_class"] = np.where(out["tissue_type"].isin(GASTRIC),
+                               "gastric", "intestinal")
+
+# Stem fraction within epithelium, pooling both stem populations. Using a
+# ratio rather than the raw stem proportion sidesteps the compositional
+# problem: proportions are constrained to sum to 1, so a raw proportion moves
+# whenever any other cell type moves.
+stem_cols = [c for c in STEM if c in prop.columns]
+epi_cols = [c for c in EPITHELIUM if c in prop.columns]
+if stem_cols and epi_cols:
+    denom = prop[epi_cols].sum(1)
+    out["stem_fraction"] = np.where(denom > 0, prop[stem_cols].sum(1) / denom,
+                                    np.nan)
+    out["prop_epithelium"] = denom
+    missing_ct = sorted(set(EPITHELIUM) - set(prop.columns))
+    if missing_ct:
+        print(f"WARNING: epithelial types absent from proportions: {missing_ct}")
 else:
-    print(f"WARNING: expected '{ISC}' and '{IEC}' in proportions; "
+    print(f"WARNING: no epithelial cell types found in proportions; "
           f"stem_fraction not computed. Columns: {list(prop.columns)}")
 
 t_cols = [c for c in prop.columns if "T cells" in c]
@@ -322,6 +351,19 @@ if t_cols:
     out["prop_Tcell_total"] = prop[t_cols].sum(1)
 if apc_cols:
     out["prop_APC_total"] = prop[apc_cols].sum(1)
+
+# Deconvolution sanity check. Gastric samples should be dominated by gastric
+# cell types and intestinal samples by intestinal ones. If they are not, the
+# proportions are unreliable and nothing downstream of them is interpretable,
+# so this is worth reading before anything else.
+print("\nDeconvolution check -- top cell types by mean proportion per sample:")
+for sid in SAMPLES:
+    i = out.index[samples == sid]
+    row = prop.loc[i].mean().sort_values(ascending=False)
+    top = ", ".join(f"{c} {v:.3f}" for c, v in row.head(3).items())
+    sf = out.loc[i, "stem_fraction"].mean() if "stem_fraction" in out else np.nan
+    print(f"  {sid} {META.loc[sid, 'tissue_type']:16s} "
+          f"{META.loc[sid, 'grade']:7s} stem_frac={sf:.3f}  {top}")
 
 path = os.path.join(OUT_DIR, f"block_scores_{BIN*16}um.parquet")
 out.to_parquet(path)
