@@ -21,6 +21,7 @@ from scipy.stats import rankdata, spearmanr
 REPO = "/home/ev039784/gut-gvhd-spatial-pilot"
 DATA_ROOT = os.path.join(REPO, "data")
 STARFYSH_OUT = os.path.join(REPO, "v2-analysis/outputs/integrated/adata_out.h5ad")
+SIGNATURE_CSV = os.path.join(REPO, "v2-analysis/GVHD_spatial_signature.csv")
 OUT_DIR = os.path.join(REPO, "v2-analysis/outputs/scores")
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -111,16 +112,49 @@ def load_starfysh_proportions(path):
             idx_key = idx_key.decode()
         barcodes = decode(obs[idx_key][:])
 
-        # Preferred: a proportions matrix in obsm.
+        # An obsm matrix carries no column labels, so names come from the
+        # signature csv -- its column order is what Starfysh was given and the
+        # order it returns proportions in.
+        sig_names = list(pd.read_csv(SIGNATURE_CSV, nrows=0).columns)
+
+        # Starfysh writes several same-shaped matrices to obsm and only one of
+        # them is the deconvolution result. Chosen by name, in priority order,
+        # never by pattern match: qc_m is the posterior mean of the cell-type
+        # proportions, while qc is a posterior sample, pc_p is the prior, and
+        # xs_k is anchor-derived. Picking the wrong one would silently produce
+        # different biology rather than an error.
+        PREFERRED = ["proportions", "qc_m"]
+
         if "obsm" in f:
+            candidates = {}
             for key in f["obsm"].keys():
-                if any(t in key.lower() for t in
-                       ("prop", "qc_m", "ql_m", "deconv", "cell_type")):
-                    mat = np.asarray(f["obsm"][key][:])
-                    if mat.ndim == 2 and mat.shape[0] == len(barcodes):
-                        cols = [f"ct_{i}" for i in range(mat.shape[1])]
-                        print(f"  proportions from obsm['{key}'] {mat.shape}")
-                        return pd.DataFrame(mat, index=barcodes, columns=cols)
+                node = f["obsm"][key]
+                if not isinstance(node, h5py.Dataset) or node.ndim != 2:
+                    continue
+                if node.shape[0] != len(barcodes):
+                    continue
+                if node.shape[1] == len(sig_names):
+                    candidates[key] = node
+
+            for key in PREFERRED:
+                if key in candidates:
+                    mat = np.asarray(candidates[key][:])
+                    print(f"  proportions from obsm['{key}'] {mat.shape}, "
+                          f"named from {os.path.basename(SIGNATURE_CSV)}")
+                    other = sorted(set(candidates) - {key})
+                    if other:
+                        print(f"  (not used, same shape: {', '.join(other)})")
+                    return pd.DataFrame(mat, index=barcodes, columns=sig_names)
+
+            if candidates:
+                raise SystemExit(
+                    f"\nFound {len(candidates)} matrices of the right shape in "
+                    f"obsm -- {', '.join(sorted(candidates))} -- but none named "
+                    f"{' or '.join(PREFERRED)}.\n"
+                    "These are different quantities (posterior mean vs sample "
+                    "vs prior), so picking one by guess would give wrong\n"
+                    "proportions without failing. Name the right key explicitly "
+                    "in PREFERRED.\n")
 
         # Fallback: one obs column per cell type, named from the signature csv.
         num_cols = {}
@@ -248,6 +282,24 @@ def score_panels(Z):
 print("Reading Starfysh proportions ...")
 props = load_starfysh_proportions(STARFYSH_OUT)
 print(f"  {props.shape[0]} spots x {props.shape[1]} cell types")
+
+# Fail here rather than downstream. Without correctly named cell types every
+# lookup returns nothing, stem_fraction is never built, and the run still
+# produces a plausible-looking parquet with no proportions in it.
+found = [c for c in EPITHELIUM if c in props.columns]
+if not found:
+    raise SystemExit(
+        "\nProportions loaded but no expected epithelial cell types are among "
+        "the columns.\nExpected some of:\n  "
+        + "\n  ".join(EPITHELIUM)
+        + f"\nGot {len(props.columns)} columns:\n  "
+        + "\n  ".join(map(str, props.columns[:30]))
+        + "\n\nThe names must match GVHD_spatial_signature.csv exactly.\n")
+print(f"  epithelial types found: {len(found)}/{len(EPITHELIUM)}")
+
+row_sums = props.sum(1)
+print(f"  row sums: min={row_sums.min():.3f} median={row_sums.median():.3f} "
+      f"max={row_sums.max():.3f}  (~1.0 expected for proportions)")
 
 all_genes = sorted({g for v in PANELS.values() for g in v}
                    | {g for v in GLUCO_MODULES.values() for g in v})

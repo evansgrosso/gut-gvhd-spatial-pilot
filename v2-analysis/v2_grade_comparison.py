@@ -81,6 +81,16 @@ def load():
         raise SystemExit(
             "This parquet predates the metadata fix -- no 'grade_group' column.\n"
             "Re-run the corrected v2_gene_scores.py on Stokes and pull it again.")
+    prop_cols = [c for c in d.columns if c.startswith("prop_")]
+    if "stem_fraction" not in d.columns or not prop_cols:
+        raise SystemExit(
+            "No cell-type proportions in this parquet "
+            f"({len(prop_cols)} prop_ columns, "
+            f"stem_fraction={'present' if 'stem_fraction' in d.columns else 'absent'}).\n"
+            "The Starfysh proportions were loaded but their columns were not "
+            "named, so every cell-type lookup found nothing.\n"
+            "Re-run the corrected v2_gene_scores.py -- it now names obsm "
+            "columns from GVHD_spatial_signature.csv and stops if it cannot.\n")
     return d
 
 
