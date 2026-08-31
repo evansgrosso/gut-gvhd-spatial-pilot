@@ -11,13 +11,11 @@ os.makedirs(OUT_DIR, exist_ok=True)
 # Score columns to test. Filtered to the ones the parquet actually has.
 PANELS = ["GLUCOMETABOLISM", "Glycolysis", "PPP", "Pyr_to_TCA",
           "OXPHOS", "ETC_CI", "ETC_CIII", "ETC_CIV", "ETC_CV", "TCA",
-          "FAO", "GLUCO - OXPHOS", "MHC_I", "MHCI_const", "MHCI_proc",
-          "MHC_II_core", "CD74", "IFN_gamma"]
+          "GLUCO - OXPHOS", "MHC_I", "MHC_II_core", "CD74", "IFN_gamma"]
 
 # Gene pairs checked for per-sample replication in step 4.
 PAIRS = [("CD74", "MHC_II_core"), ("MHC_II_core", "IFN_gamma"),
-         ("CD74", "IFN_gamma"), ("MHCI_proc", "IFN_gamma"),
-         ("MHCI_const", "IFN_gamma"), ("MHCI_proc", "MHCI_const")]
+         ("CD74", "IFN_gamma")]
 
 # Independent-samples t-test. Returns the mean difference and its p-value.
 def two_group_test(a, b):
@@ -46,22 +44,24 @@ print("=== Deconvolution check ===")
 print(d.groupby(["sample", "tissue_class"], observed=True)[GATE]
       .mean().round(3).to_string())
 
-# Primary stratum: epithelium-dominant blocks.
-epi = d[d["prop_epithelium"] >= d["prop_epithelium"].median()].copy()
+# Primary stratum: ISC-rich bins, top third by stem_fraction within each sample.
+cut = d.groupby("sample", observed=True)["stem_fraction"].transform(
+    lambda s: s.quantile(2 / 3))
+isc = d[d["stem_fraction"] >= cut].copy()
 
 # Step 2: severe vs mild/ND, at block, sample and patient level.
 rows = []
 for panel in PANELS:
-    d_blk, p_blk = two_group_test(epi[epi.grade_group == "severe"][panel],
-                                  epi[epi.grade_group == "mild_no"][panel])
+    d_blk, p_blk = two_group_test(isc[isc.grade_group == "severe"][panel],
+                                  isc[isc.grade_group == "mild_no"][panel])
 
-    by_sample = epi.groupby("sample", observed=True)[panel].mean()
-    g_sample = epi.groupby("sample", observed=True)["grade_group"].first()
+    by_sample = isc.groupby("sample", observed=True)[panel].mean()
+    g_sample = isc.groupby("sample", observed=True)["grade_group"].first()
     d_smp, p_smp = two_group_test(by_sample[g_sample == "severe"],
                                   by_sample[g_sample == "mild_no"])
 
-    by_pat = epi.groupby("patient", observed=True)[panel].mean()
-    g_pat = epi.groupby("patient", observed=True)["grade_group"].first()
+    by_pat = isc.groupby("patient", observed=True)[panel].mean()
+    g_pat = isc.groupby("patient", observed=True)["grade_group"].first()
     d_pat, p_pat = two_group_test(by_pat[g_pat == "severe"],
                                   by_pat[g_pat == "mild_no"])
 
@@ -69,12 +69,12 @@ for panel in PANELS:
                      diff_sample=d_smp, p_sample=p_smp,
                      diff_patient=d_pat, p_patient=p_pat))
 grade = pd.DataFrame(rows)
-print("\n=== Step 2: Severe vs Mild/ND ===")
+print(f"\n=== Step 2: Severe vs Mild/ND (ISC-rich, {len(isc)} of {len(d)} blocks) ===")
 print(grade.round(4).to_string(index=False))
 
 # Step 2b: same comparison within tissue class, since grade is entangled with tissue.
 t_rows = []
-for tc, sub in epi.groupby("tissue_class", observed=True):
+for tc, sub in isc.groupby("tissue_class", observed=True):
     for panel in PANELS:
         diff, p = two_group_test(sub[sub.grade_group == "severe"][panel],
                                  sub[sub.grade_group == "mild_no"][panel])
