@@ -31,19 +31,31 @@ GASTRIC = ["Antrum", "Stomach_Body", "Stomach"] # Subgroup to contain gastric sa
 # Subgroup cell signatures into desired groups. STEM cells and mature epithelial cells.
 STEM = ["Intestine Epithelial Stem cells", "Stomach Stem cells"] # Sums each type of stem cell (instestinal vs stomach) under one group.
 EPITHELIUM = STEM + ["Instestinal Epithelial cells", "Stomach Epithelial cells", "Stomach Body Epithelial cells"] # Sums each type of epithelial cell under one group
-ENTEROCYTE = "Enterocyte"
 
-# Sub-modules are scored separately and then averaged, so each branch of
-# glucose handling (breakdown, the pentose shunt, entry into the TCA cycle)
-# gets equal say -- a flat mean over all 22 genes would let whichever branch
-# has the most highly-detected genes dominate.
+# Sub-modules are scored separately and then averaged.
 GLUCO_MODULES = {
     "Glycolysis": ["HK1", "HK2", "PFKM", "PFKP", "PKM", "GPI", "PGAM1", "ENO1"],
     "PPP":        ["G6PD", "PGLS", "PGD", "TKT", "TALDO1", "RPIA", "RPE"],
     "Pyr_to_TCA": ["PDHA1", "PDHB", "DLAT", "DLD", "PDP1", "MPC1", "MPC2"],
 }
-OXPHOS_MODULES = {
 
+# Sub-modules are scored separately and then averaged.
+OXPHOS_MODULES = {
+    "ETC_CI":   ["NDUFA1", "NDUFA2", "NDUFA3", "NDUFA8", "NDUFA9", "NDUFA10",
+                 "NDUFA11", "NDUFA13", "NDUFAB1", "NDUFB1", "NDUFB2", "NDUFB3",
+                 "NDUFB5", "NDUFB6", "NDUFB7", "NDUFB8", "NDUFB9", "NDUFB10",
+                 "NDUFB11", "NDUFC1", "NDUFC2", "NDUFS1", "NDUFS2", "NDUFS3",
+                 "NDUFS4", "NDUFS5", "NDUFS6", "NDUFS7", "NDUFV1", "NDUFV2",
+                 "NDUFV3"],
+    "ETC_CIII": ["UQCRC1", "UQCRC2", "UQCRB", "UQCRQ", "UQCRH", "UQCR10",
+                 "UQCR11", "CYC1"],
+    "ETC_CIV":  ["COX4I1", "COX6A1", "COX6B1", "COX6C", "COX7A2", "COX7B",
+                 "COX7C", "COX8A"],
+    "ETC_CV":   ["ATP5F1A", "ATP5F1B", "ATP5F1C", "ATP5F1D", "ATP5F1E",
+                 "ATP5MC1", "ATP5MC2", "ATP5MC3", "ATP5ME", "ATP5MF", "ATP5MG",
+                 "ATP5PB", "ATP5PD", "ATP5PF"],
+    "TCA":      ["ACO2", "IDH2", "IDH3A", "IDH3B", "IDH3G", "OGDH", "SUCLG1",
+                 "SUCLG2", "SDHA", "SDHB", "FH", "MDH2"],
 }
 
 # Defines gene panels for desired cell expression
@@ -54,79 +66,21 @@ PANELS = {
     "IFN_gamma": ["STAT1", "IRF1", "GBP1", "GBP2", "CXCL9", "CXCL10"],
 }
 
+# Decodes h5py byte strings into a string array
+def decode(arr):
+    return np.array([x.decode() if isinstance(x, bytes) else str(x) for x in arr])
+
 # Loads proportions as computed by Starfysh
 def load_starfysh_proportions(path):
     sig_names = list(pd.read_csv(SIGNATURE_CSV, nrows=0).columns)
-    PREFERRED = ["proportions", "qc_m"]
-
     with h5py.File(path, "r") as f:
-        def decode(arr):
-            return np.array([x.decode() if isinstance(x, bytes) else str(x)
-                             for x in arr])
-
-        obs = f["obs"]
-        idx_key = obs.attrs.get("_index", "_index")
-        if isinstance(idx_key, bytes):
-            idx_key = idx_key.decode()
-        barcodes = decode(obs[idx_key][:])
-
-        if "obsm" in f:
-            candidates = {}
-            for key in f["obsm"].keys():
-                node = f["obsm"][key]
-                if not isinstance(node, h5py.Dataset) or node.ndim != 2:
-                    continue
-                if node.shape[0] != len(barcodes):
-                    continue
-                if node.shape[1] == len(sig_names):
-                    candidates[key] = node
-
-            for key in PREFERRED:
-                if key in candidates:
-                    mat = np.asarray(candidates[key][:])
-                    print(f"  proportions from obsm['{key}'] {mat.shape}, "
-                          f"named from {os.path.basename(SIGNATURE_CSV)}")
-                    other = sorted(set(candidates) - {key})
-                    if other:
-                        print(f"  (not used, same shape: {', '.join(other)})")
-                    return pd.DataFrame(mat, index=barcodes, columns=sig_names)
-
-            if candidates:
-                raise SystemExit(
-                    f"\nFound {len(candidates)} matrices of the right shape in "
-                    f"obsm -- {', '.join(sorted(candidates))} -- but none named "
-                    f"{' or '.join(PREFERRED)}.\n"
-                    "These are different quantities (posterior mean vs sample "
-                    "vs prior), so picking one by guess would give wrong\n"
-                    "proportions without failing. Name the right key explicitly "
-                    "in PREFERRED.\n")
-
-        # Fallback: one obs column per cell type, named directly.
-        num_cols = {}
-        for key in obs.keys():
-            if key.startswith("_"):
-                continue
-            node = obs[key]
-            if isinstance(node, h5py.Dataset) and node.dtype.kind == "f":
-                num_cols[key] = node[:]
-        hits = [k for k in num_cols if k in EPITHELIUM or k == ENTEROCYTE
-                or "cell" in k.lower() or "T cells" in k]
-        if hits:
-            print(f"  proportions from {len(num_cols)} obs columns")
-            return pd.DataFrame(num_cols, index=barcodes)
-
-    raise SystemExit(
-        "\nCould not find cell-type proportions in the Starfysh output.\n"
-        f"Inspect with:\n"
-        f"  python -c \"import h5py; f=h5py.File('{STARFYSH_OUT}','r'); "
-        f"print(list(f['obsm'].keys()))\"\n")
+        barcodes = decode(f["obs"]["_index"][:])
+        mat = f["obsm"]["qc_m"][:]
+    return pd.DataFrame(mat, index=barcodes, columns=sig_names)
 
 # Sums a sample's raw counts into 80 micrometer blocks. Normalizes and log-transforms the counts.
 def bin_and_normalize(sid, genes_wanted):
     with h5py.File(f"{DATA_ROOT}/{sid.lower()}.h5ad", "r") as f:
-        def decode(arr):
-            return np.array([x.decode() if isinstance(x, bytes) else str(x)
-                             for x in arr])
         var = decode(f["var"]["_index"][:])
         obs = decode(f["obs"]["_index"][:])
         X = sp.csr_matrix((f["X"]["data"][:], f["X"]["indices"][:],
@@ -137,8 +91,7 @@ def bin_and_normalize(sid, genes_wanted):
     pos = pos.set_index("barcode").reindex(obs)
 
     keep = pos["array_row"].notna().values
-    X, pos = X[keep], pos[keep]
-    obs = obs[keep]
+    X, pos, obs = X[keep], pos[keep], obs[keep]
 
     row = (pos["array_row"].values // BIN).astype(int)
     col = (pos["array_col"].values // BIN).astype(int)
@@ -150,127 +103,82 @@ def bin_and_normalize(sid, genes_wanted):
     counts = agg @ X
     depth = np.asarray(counts.sum(1)).ravel()
 
-    present = [g for g in genes_wanted if g in set(var)]
-    missing = sorted(set(genes_wanted) - set(var))
-    idx = [int(np.where(var == g)[0][0]) for g in present]
+    vidx = {g: i for i, g in enumerate(var)}
+    present = [g for g in genes_wanted if g in vidx]
+    raw = np.asarray(counts[:, [vidx[g] for g in present]].todense(), dtype=np.float64)
+    log_cpm = pd.DataFrame(np.log1p(raw / depth[:, None] * 1e4),
+                           columns=present, index=block_ids)
 
-    raw = np.asarray(counts[:, idx].todense(), dtype=np.float64)
-    cpm = raw / depth[:, None] * 1e4                    # step 2
-    log_cpm = np.log1p(cpm)                             # step 3
-    log_cpm = pd.DataFrame(log_cpm, columns=present, index=block_ids)
+    spot_to_block = pd.Series(block_ids[inv], index=[f"{b}_{sid}" for b in obs])
+    return log_cpm, depth, block_ids, spot_to_block
 
-    spot_to_block = pd.Series(block_ids[inv],
-                              index=[f"{b}_{sid}" for b in obs])
-    return log_cpm, depth, block_ids, spot_to_block, missing
-
-# Compute z-score of each gene across the sample's blocks. 
+# Compute z-score of each gene across the sample's blocks.
 def score_panel(log_cpm, genes):
-    """Steps 4-5: z-score each gene across this sample's blocks, then
-    average across the panel's genes.
-    """
     have = [g for g in genes if g in log_cpm.columns]
-    if not have:
-        return None
     z = (log_cpm[have] - log_cpm[have].mean()) / log_cpm[have].std()
     return z.mean(axis=1)
 
+# Scores each sub-module on its own, then averages them into the group total.
+def score_modules(log_cpm, scores, modules, total):
+    mods = {}
+    for name, genes in modules.items():
+        mods[name] = score_panel(log_cpm, genes)
+        scores[name] = mods[name].values
+    scores[total] = pd.DataFrame(mods).mean(axis=1).values
 
-print("Reading Starfysh proportions ...")
 props = load_starfysh_proportions(STARFYSH_OUT)
-print(f"  {props.shape[0]} spots x {props.shape[1]} cell types")
-
-found = [c for c in EPITHELIUM if c in props.columns]
-if not found:
-    raise SystemExit(
-        "\nProportions loaded but no expected epithelial cell types are among "
-        "the columns.\nExpected some of:\n  "
-        + "\n  ".join(EPITHELIUM)
-        + f"\nGot {len(props.columns)} columns:\n  "
-        + "\n  ".join(map(str, props.columns[:30]))
-        + "\n\nThe names must match GVHD_spatial_signature.csv exactly.\n")
-print(f"  epithelial types found: {len(found)}/{len(EPITHELIUM)}")
-
-row_sums = props.sum(1)
-print(f"  row sums: min={row_sums.min():.3f} median={row_sums.median():.3f} "
-      f"max={row_sums.max():.3f}  (~1.0 expected for proportions)")
 
 all_genes = sorted({g for v in PANELS.values() for g in v}
-                   | {g for v in GLUCO_MODULES.values() for g in v})
+                   | {g for v in GLUCO_MODULES.values() for g in v}
+                   | {g for v in OXPHOS_MODULES.values() for g in v})
 
-score_rows, prop_rows, depth_rows, sample_rows, block_index = [], [], [], [], []
+score_rows, prop_rows = [], []
 
 for sid in SAMPLES:
-    log_cpm, depth, block_ids, spot_to_block, missing = bin_and_normalize(
-        sid, all_genes)
+    log_cpm, depth, block_ids, spot_to_block = bin_and_normalize(sid, all_genes)
 
-    scores = pd.DataFrame(index=block_ids)
+    scores = pd.DataFrame(index=[f"{sid}_{b}" for b in block_ids])
     for name, genes in PANELS.items():
-        s = score_panel(log_cpm, genes)
-        if s is not None:
-            scores[name] = s.values
+        scores[name] = score_panel(log_cpm, genes).values
+    score_modules(log_cpm, scores, GLUCO_MODULES, "GLUCOMETABOLISM")
+    score_modules(log_cpm, scores, OXPHOS_MODULES, "OXPHOS")
 
-    modules = {}
-    for name, genes in GLUCO_MODULES.items():
-        s = score_panel(log_cpm, genes)
-        modules[name] = s
-        scores[name] = s.values
-    scores["GLUCOMETABOLISM"] = pd.DataFrame(modules).mean(axis=1).values
-
+    # Positive means glucose-favored. Pyruvate entry counts as the last step of
+    # glucose handling, so the split falls at the TCA cycle itself.
     scores["GLUCO - OXPHOS"] = scores["GLUCOMETABOLISM"] - scores["OXPHOS"]
 
-    # Average the 16um proportions into the same blocks. 
+    # Average the 16um proportions into the same blocks.
     shared = props.index.intersection(spot_to_block.index)
     grouped = props.loc[shared].groupby(spot_to_block.loc[shared]).mean()
+    grouped = grouped.reindex(block_ids).add_prefix("prop_")
+    grouped.index = scores.index
+    grouped["sample"] = sid
+    grouped["depth"] = depth
 
     score_rows.append(scores)
-    prop_rows.append(grouped.reindex(block_ids))
-    depth_rows.append(pd.Series(depth, index=block_ids))
-    sample_rows.append(np.repeat(sid, len(block_ids)))
-    block_index.append(block_ids)
+    prop_rows.append(grouped)
 
-scores = pd.concat(score_rows, ignore_index=False)
-scores.index = np.concatenate([[f"{s}_{b}" for b in ids]
-                               for s, ids in zip(SAMPLES, block_index)])
-prop = pd.concat(prop_rows)
-prop.index = scores.index
-depth = pd.concat(depth_rows)
-depth.index = scores.index
-samples = np.concatenate(sample_rows)
-
-print(f"\nTotal: {len(scores)} blocks, median depth {depth.median():.0f}")
-
-out = pd.concat([scores, prop.add_prefix("prop_")], axis=1)
-out["sample"] = samples
-out["depth"] = depth.values
+out = pd.concat([pd.concat(score_rows), pd.concat(prop_rows)], axis=1)
 
 for col in ("patient", "tissue_type", "grade"):
-    out[col] = META[col].reindex(samples).values
-# Collapses Mild and ND into one arm, the same split the reference paper
-# uses (its own code: df_ND['Grade'] = 'mild/no').
+    out[col] = META[col].reindex(out["sample"]).values
 out["grade_group"] = np.where(out["grade"] == "Severe", "severe", "mild_no")
 out["tissue_class"] = np.where(out["tissue_type"].isin(GASTRIC),
                                "gastric", "intestinal")
 
 # STEM cell fraction within epithelium
-stem_cols = [c for c in STEM if c in prop.columns]
-epi_cols = [c for c in EPITHELIUM if c in prop.columns]
-denom = prop[epi_cols].sum(1)
-out["stem_fraction"] = np.where(denom > 0, prop[stem_cols].sum(1) / denom, np.nan)
+denom = out[[f"prop_{c}" for c in EPITHELIUM]].sum(1)
+out["stem_fraction"] = np.where(
+    denom > 0, out[[f"prop_{c}" for c in STEM]].sum(1) / denom, np.nan)
 out["prop_epithelium"] = denom
 
 # T cell and APC proportions
-t_cols = [c for c in prop.columns if "T cells" in c]
-apc_cols = [c for c in prop.columns if c in ("Myeloid", "B cells")]
-if t_cols:
-    out["prop_Tcell_total"] = prop[t_cols].sum(1)
-if apc_cols:
-    out["prop_APC_total"] = prop[apc_cols].sum(1)
+out["prop_Tcell_total"] = out[[c for c in out.columns if "T cells" in c]].sum(1)
+out["prop_APC_total"] = out[["prop_Myeloid", "prop_B cells"]].sum(1)
 
-
-path = os.path.join(OUT_DIR, f"block_scores_{BIN*16}um.parquet")
-out.to_parquet(path)
-print(f"\nWrote {path}  ({len(out)} rows x {out.shape[1]} cols)")
+out.to_parquet(os.path.join(OUT_DIR, f"block_scores_{BIN*16}um.parquet"))
 
 with open(os.path.join(OUT_DIR, "panel_definitions.json"), "w") as f:
     json.dump({"bin_um": BIN * 16, "panels": PANELS,
-               "gluco_modules": GLUCO_MODULES}, f, indent=2)
+               "gluco_modules": GLUCO_MODULES,
+               "oxphos_modules": OXPHOS_MODULES}, f, indent=2)
