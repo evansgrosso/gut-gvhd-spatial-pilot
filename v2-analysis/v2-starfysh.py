@@ -24,7 +24,6 @@ gene_sig = pd.read_csv("v2-analysis/GVHD_spatial_signature.csv")
 # Define variables to store intermediary data
 raw_list, norm_list, img_metadata = [], [], {}
 
-
 for sid in SAMPLES:    
     # Read the h5ad file produced by QC script
     a = sc.read_h5ad(f"{DATA_ROOT}/{sid.lower()}.h5ad")
@@ -86,8 +85,7 @@ adata_norm_all = ad.concat(norm_list, axis=0, join="inner")
 del raw_list, norm_list  # Free RAM
 
 # Select HVGs accounting for differences in each batch.
-sc.pp.highly_variable_genes(adata_norm_all, flavor="seurat",
-                            n_top_genes=2000, batch_key="sample")
+sc.pp.highly_variable_genes(adata_norm_all)
 
 # Flag raw data with HVG tags
 adata_raw_all.var["highly_variable"] = adata_norm_all.var["highly_variable"].values
@@ -109,8 +107,8 @@ for sid in SAMPLES:
         gene_sig,
         img_metadata[sid],
         sample_id=sid,
-        window_size=3,      # Paper's default
-        patch_r=13,         # Paper's default
+        window_size=1,
+        patch_r=13,
     )
 
     # Extract the signature scores (the integrate wrapper concatenates these)
@@ -128,7 +126,7 @@ args = utils_integrate.VisiumArguments_integrate(
     img_metadata,
     individual_args,
     sample_id=SAMPLES,
-    window_size=3,
+    window_size=1,
     patch_r=13,
 )
 
