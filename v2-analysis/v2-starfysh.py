@@ -24,7 +24,8 @@ gene_sig = pd.read_csv("v2-analysis/GVHD_spatial_signature.csv")
 # Define variables to store intermediary data
 raw_list, norm_list, img_metadata = [], [], {}
 
-for sid in SAMPLES:    
+print(f"Loading {len(SAMPLES)} samples...")
+for sid in SAMPLES:
     # Read the h5ad file produced by QC script
     a = sc.read_h5ad(f"{DATA_ROOT}/{sid.lower()}.h5ad")
     
@@ -79,6 +80,7 @@ for sid in SAMPLES:
         "img": img,
     }
 
+print("Concatenating samples...")
 # Concatenate all raw data vertically (union of genes across samples)
 adata_raw_all = ad.concat(raw_list, axis=0, join="inner")
 adata_norm_all = ad.concat(norm_list, axis=0, join="inner")
@@ -89,6 +91,7 @@ sc.pp.highly_variable_genes(adata_norm_all)
 
 # Flag raw data with HVG tags
 adata_raw_all.var["highly_variable"] = adata_norm_all.var["highly_variable"].values
+print("Selected HVGs.")
 
 # Filter gene signatures to only those included in the full gene panel
 for col in gene_sig.columns:
@@ -98,6 +101,7 @@ for col in gene_sig.columns:
 per_raw = {s: adata_raw_all[adata_raw_all.obs["sample"] == s].copy() for s in SAMPLES}
 per_norm = {s: adata_norm_all[adata_norm_all.obs["sample"] == s].copy() for s in SAMPLES}
 
+print("Building per-sample signature scores...")
 # STEP 4: Build per-sample VisiumArguments (within-sample signature scoring)
 individual_args = {}
 for sid in SAMPLES:
@@ -118,6 +122,7 @@ for sid in SAMPLES:
     )
     del va  # Free RAM
 
+print("Building integrated Starfysh arguments...")
 # Defines Starfysh arguments
 args = utils_integrate.VisiumArguments_integrate(
     adata_raw_all,
@@ -133,6 +138,7 @@ args = utils_integrate.VisiumArguments_integrate(
 # Convert to dense matrix
 args.adata.X = args.adata.X.toarray()
 
+print("Starting Starfysh training...")
 # Run Starfysh training
 model, loss = utils_integrate.run_starfysh(
     args,
@@ -145,7 +151,9 @@ model, loss = utils_integrate.run_starfysh(
     device= "cuda",
     verbose=True,       # Print progress
 )
+print("Training complete.")
 
+print("Running model evaluation...")
 # Extract deconvoluted spot proportions
 inference_outputs, generative_outputs = model_eval(
     model,
@@ -157,6 +165,7 @@ inference_outputs, generative_outputs = model_eval(
 
 adata_out = args.adata
 
+print("Saving outputs...")
 # Save the annotated data with proportions
 adata_out.write(os.path.join(OUT_DIR, "adata_out.h5ad"))
 
@@ -166,3 +175,5 @@ torch.save(model.state_dict(), os.path.join(OUT_DIR, "model.pt"))
 # Save training losses for diagnostics
 with open(os.path.join(OUT_DIR, "losses.json"), "w") as f:
     json.dump(loss, f)
+
+print("Done.")
