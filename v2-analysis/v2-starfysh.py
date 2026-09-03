@@ -90,7 +90,7 @@ sc.pp.highly_variable_genes(adata_norm_all)
 # Flag raw data with HVG tags
 adata_raw_all.var["highly_variable"] = adata_norm_all.var["highly_variable"].values
 
-# Filter gene signatures to only HVGs
+# Filter gene signatures to only those included in the full gene panel
 for col in gene_sig.columns:
     gene_sig[col] = gene_sig[col].where(gene_sig[col].isin(adata_norm_all.var_names))
     
@@ -142,7 +142,7 @@ model, loss = utils_integrate.run_starfysh(
     batch_size=32,      # Paper's value: batch size
     alpha_mul=50,       # Paper's value: annealing schedule multiplier
     poe=False,          # Paper's value: no image integration (PoE) for this dataset
-    device= "cpu",
+    device= "cuda",
     verbose=True,       # Print progress
 )
 
@@ -152,7 +152,7 @@ inference_outputs, generative_outputs = model_eval(
     args.adata,
     args,
     poe=False,
-    device="cpu",
+    device="cuda",
 )
 
 adata_out = args.adata
